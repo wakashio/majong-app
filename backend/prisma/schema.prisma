@@ -1,0 +1,231 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Player {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hanchanPlayers HanchanPlayer[]
+  scores         Score[]
+  dealerRounds   Round[]          @relation("DealerPlayer")
+  actions        RoundAction[]
+  actionTargets  RoundAction[]    @relation("ActionTarget")
+  sessionPlayers SessionPlayer[]
+  nakis          Naki[]
+  riichis        Riichi[]
+  nakiTargets    Naki[]           @relation("NakiTarget")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  date      DateTime // セッションの日付（日付のみ、時刻なし）
+  name      String?
+  umaOkaConfig Json? // ウマオカ設定 { initialScore: number, returnScore: number, uma: [number, number, number, number] }
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessionPlayers SessionPlayer[]
+  hanchans       Hanchan[]
+}
+
+model SessionPlayer {
+  id        String   @id @default(uuid())
+  sessionId String
+  playerId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  player  Player  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, playerId])
+  @@index([sessionId])
+  @@index([playerId])
+}
+
+model Hanchan {
+  id        String        @id @default(uuid())
+  name      String?
+  startedAt DateTime
+  endedAt   DateTime?
+  status    HanchanStatus @default(IN_PROGRESS)
+  sessionId String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  session        Session?        @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  hanchanPlayers HanchanPlayer[]
+  rounds         Round[]
+}
+
+enum HanchanStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+model HanchanPlayer {
+  id                 String   @id @default(uuid())
+  hanchanId          String
+  playerId           String
+  seatPosition       Int      // 0-3
+  initialScore       Int      @default(25000)
+  finalScore         Int?     // ウマオカ考慮前の値（currentScore）
+  finalScoreWithUmaOka Int?   // ウマオカ考慮後の値
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  hanchan Hanchan @relation(fields: [hanchanId], references: [id], onDelete: Cascade)
+  player  Player  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([hanchanId, playerId])
+  @@unique([hanchanId, seatPosition])
+  @@index([hanchanId])
+  @@index([playerId])
+}
+
+model Round {
+  id              String           @id @default(uuid())
+  hanchanId       String
+  roundNumber     Int // 1-16
+  wind            Wind
+  dealerPlayerId  String
+  honba           Int              @default(0)
+  riichiSticks    Int              @default(0)
+  resultType      RoundResultType?
+  specialDrawType SpecialDrawType?
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  hanchan      Hanchan       @relation(fields: [hanchanId], references: [id], onDelete: Cascade)
+  dealerPlayer Player        @relation("DealerPlayer", fields: [dealerPlayerId], references: [id])
+  scores       Score[]
+  actions      RoundAction[]
+  nakis        Naki[]
+  riichis      Riichi[]
+
+  @@index([hanchanId])
+  @@index([dealerPlayerId])
+}
+
+enum Wind {
+  EAST
+  SOUTH
+  WEST
+  NORTH
+}
+
+enum RoundResultType {
+  TSUMO
+  RON
+  DRAW
+  NAGASHI_MANGAN
+  SPECIAL_DRAW
+}
+
+enum SpecialDrawType {
+  FOUR_KAN
+  FOUR_WIND
+  NINE_TERMINALS
+}
+
+model Score {
+  id          String   @id @default(uuid())
+  roundId     String
+  playerId    String
+  scoreChange Int
+  isDealer    Boolean
+  isWinner    Boolean
+  isRonTarget Boolean?
+  isTenpai    Boolean?
+  han         Int?
+  fu          Int?
+  yaku        String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  round  Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([roundId])
+  @@index([playerId])
+}
+
+model Naki {
+  id             String   @id @default(uuid())
+  roundId        String
+  playerId       String
+  type           NakiType
+  targetPlayerId String?
+  tiles          String[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  round        Round   @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  player       Player  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  targetPlayer Player? @relation("NakiTarget", fields: [targetPlayerId], references: [id])
+
+  @@index([roundId])
+  @@index([playerId])
+}
+
+enum NakiType {
+  PON
+  CHI
+  DAIMINKAN
+  ANKAN
+}
+
+model RoundAction {
+  id            String           @id @default(uuid())
+  roundId       String
+  playerId      String
+  type          RoundActionType
+  declaredAt    DateTime?
+  nakiType      NakiType?
+  targetPlayerId String?
+  tiles         String[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  round        Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  player       Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  targetPlayer Player? @relation("ActionTarget", fields: [targetPlayerId], references: [id])
+
+  @@index([roundId])
+  @@index([playerId])
+  @@unique([roundId, playerId, type])
+}
+
+enum RoundActionType {
+  NAKI
+  RIICHI
+}
+
+model Riichi {
+  id             String   @id @default(uuid())
+  roundId        String
+  playerId       String
+  isDoubleRiichi Boolean  @default(false)
+  isIppatsu      Boolean  @default(false)
+  declaredAt     DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  round  Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([roundId])
+  @@index([playerId])
+}

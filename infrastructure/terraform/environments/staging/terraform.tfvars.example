@@ -1,0 +1,12 @@
+# ステージング環境の変数設定例
+# このファイルをコピーして terraform.tfvars を作成し、実際の値を設定してください
+
+project_id = "your-gcp-project-id"
+region     = "us-west1"
+
+db_user     = "majong_user"
+db_password = "your-secure-password"
+
+frontend_image = "gcr.io/your-project-id/majong-app-frontend:latest"
+backend_image  = "gcr.io/your-project-id/majong-app-backend:latest"
+

@@ -1,0 +1,73 @@
+name: Deploy to GCP
+
+on:
+  push:
+    branches:
+      - main      # 本番環境
+      - staging   # ステージング環境
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_REGION: us-west1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+      
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker
+      
+      - name: Build and push Frontend
+        run: |
+          cd frontend
+          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-frontend:${{ github.sha }} .
+          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-frontend:latest .
+          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-frontend:${{ github.sha }}
+          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-frontend:latest
+      
+      - name: Build and push Backend
+        run: |
+          cd backend
+          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:${{ github.sha }} .
+          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:latest .
+          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:${{ github.sha }}
+          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:latest
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+      
+      - name: Terraform Init
+        working-directory: infrastructure/terraform/environments/${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+        run: terraform init
+      
+      - name: Terraform Plan
+        working-directory: infrastructure/terraform/environments/${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+        run: terraform plan
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_frontend_image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-frontend:${{ github.sha }}
+          TF_VAR_backend_image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:${{ github.sha }}
+      
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+        working-directory: infrastructure/terraform/environments/${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+        run: terraform apply -auto-approve
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_frontend_image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-frontend:${{ github.sha }}
+          TF_VAR_backend_image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:${{ github.sha }}
+
