@@ -28,12 +28,23 @@ export function getPrismaClient(): PrismaClient {
       const maskedUrl = databaseUrl.replace(/:[^:@]+@/, ":****@");
       console.log("DATABASE_URL (masked):", maskedUrl);
       
-      // 接続文字列の形式を確認
-      const urlObj = new URL(databaseUrl);
-      console.log("Connection type:", urlObj.hostname ? "TCP" : "Unix socket");
-      console.log("Hostname:", urlObj.hostname || "N/A (Unix socket)");
-      console.log("Port:", urlObj.port || "N/A (Unix socket)");
-      console.log("Host parameter:", urlObj.searchParams.get("host") || "N/A");
+      // 接続文字列の形式を確認（Unixソケット接続の場合はURL解析をスキップ）
+      if (databaseUrl.includes("host=/cloudsql/")) {
+        console.log("Connection type: Unix socket (Cloud SQL Proxy)");
+        const hostMatch = databaseUrl.match(/host=([^&]+)/);
+        if (hostMatch) {
+          console.log("Unix socket path:", hostMatch[1]);
+        }
+      } else {
+        try {
+          const urlObj = new URL(databaseUrl);
+          console.log("Connection type: TCP");
+          console.log("Hostname:", urlObj.hostname);
+          console.log("Port:", urlObj.port || "5432 (default)");
+        } catch {
+          console.log("Connection type: Could not parse URL (may be Unix socket)");
+        }
+      }
     } else {
       console.log("Using default DATABASE_URL");
     }

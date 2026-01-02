@@ -2,13 +2,28 @@
 // npm install --save-dev prisma dotenv
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
+import * as path from "path";
+
+// DATABASE_URLを取得して検証
+const databaseUrl = process.env["DATABASE_URL"] || "";
+
+// デバッグ用: 接続文字列をログ出力（パスワード部分をマスク）
+if (databaseUrl) {
+  const maskedUrl = databaseUrl.replace(/:[^:@]+@/, ":****@");
+  console.log("DATABASE_URL (masked):", maskedUrl);
+  
+  // Unixソケット接続の場合、hostパラメータを確認
+  if (databaseUrl.includes("host=/cloudsql/")) {
+    console.log("Using Unix socket connection via Cloud SQL Proxy");
+  }
+}
 
 export default defineConfig({
-  schema: "prisma/schema.prisma",
+  schema: path.join("prisma", "schema.prisma"),
   migrations: {
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: databaseUrl,
   },
 });
