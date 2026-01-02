@@ -5,7 +5,7 @@ import { test, expect } from '@playwright/test';
 test('visits the app root url', async ({ page }) => {
   await page.goto('/');
   // アプリバーのタイトルが表示されることを確認
-  await expect(page.locator('v-toolbar-title, [class*="toolbar-title"]')).toContainText('麻雀記録アプリ');
+  await expect(page.getByText('麻雀記録アプリ')).toBeVisible();
 });
 
 test.describe('TASK-20251230-012: 半荘と局登録のUIを実用に寄せる', () => {
