@@ -2820,13 +2820,13 @@ describe("Rounds API", () => {
         },
       });
 
-      // 局終了（子がロン、基本点2000点）
+      // 局終了（子がロン、基本点2000点（本場・積み棒除く））
       const endData = {
         resultType: "RON",
         scores: [
           {
             playerId: testPlayerIds[1],
-            scoreChange: 2000,
+            scoreChange: 2000, // 和了点（本場・積み棒除く）
             isDealer: false,
             isWinner: true,
             isRonTarget: false,
@@ -2836,7 +2836,7 @@ describe("Rounds API", () => {
           },
           {
             playerId: testPlayerIds[2],
-            scoreChange: -2000,
+            scoreChange: 0, // 放銃者の点数はバックエンドで計算される
             isDealer: false,
             isWinner: false,
             isRonTarget: true,
@@ -2868,17 +2868,17 @@ describe("Rounds API", () => {
       expect(response.body.data.scores).toHaveLength(4);
 
       // 点数変動を確認
-      // 和了者（リーチ者）: 2000（基本点）+ 2000（積み棒）- 1000（リーチ）= 3000
-      // 放銃者（子）: -2000（基本点）- 100（本場）= -2100
+      // 和了者（リーチ者）: 2000（基本点）+ 300（本場 × 1 × 300）+ 2000（積み棒 × 2 × 1000）- 1000（リーチ）= 3300
+      // 放銃者（子）: -(2000（基本点）+ 300（本場 × 1 × 300）) - 1000（リーチ）= -3300
       const winnerScore = response.body.data.scores.find(
         (s: { isWinner: boolean }) => s.isWinner
       );
-      expect(winnerScore.scoreChange).toBe(3000); // 2000 + 2000（積み棒）- 1000（リーチ）
+      expect(winnerScore.scoreChange).toBe(3300); // 2000 + 300（本場）+ 2000（積み棒）- 1000（リーチ）
 
       const ronTargetScore = response.body.data.scores.find(
         (s: { isRonTarget: boolean }) => s.isRonTarget
       );
-      expect(ronTargetScore.scoreChange).toBe(-2100); // -2000 - 100（本場）
+      expect(ronTargetScore.scoreChange).toBe(-3300); // -(2000 + 300（本場）) - 1000（リーチ）
 
       await prisma.round.delete({ where: { id: round.id } });
     });

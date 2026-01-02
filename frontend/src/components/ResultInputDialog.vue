@@ -401,6 +401,7 @@ const reverseCalculateBaseScore = (
 
   return null;
 };
+
 </script>
 
 <template>

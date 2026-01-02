@@ -818,22 +818,97 @@ export const roundService = {
         yaku: string[];
       }>;
 
-      // フロントエンドから送信された点数をそのまま使用
+      // フロントエンドから送信された点数を処理
       if (data.scores && data.scores.length > 0) {
-        scoresToCreate = data.scores.map((score) => {
-          return {
-            roundId,
-            playerId: score.playerId,
-            scoreChange: score.scoreChange,
-            isDealer: score.isDealer,
-            isWinner: score.isWinner ?? false,
-            isRonTarget: score.isRonTarget ?? null,
-            isTenpai: score.isTenpai ?? null,
-            han: score.han ?? null,
-            fu: score.fu ?? null,
-            yaku: score.yaku ?? [],
-          };
-        });
+        if (data.resultType === RoundResultType.RON) {
+          // ロン時: 和了者の点数（本場・積み棒除く）から、本場・積み棒を含めた最終点数を計算
+          const winnerScore = data.scores.find((s) => s.isWinner)?.scoreChange ?? 0;
+          const honba = roundForCalculation?.honba ?? round.honba ?? 0;
+          const riichiSticks = roundForCalculation?.riichiSticks ?? round.riichiSticks ?? 0;
+          
+          // 和了者の最終獲得点数 = 和了点（本場・積み棒除く） + (本場 × 300) + (積み棒 × 1000)
+          const finalWinnerScore = winnerScore + (honba * 300) + (riichiSticks * 1000);
+          
+          // 放銃者の最終支払い点数 = -(和了点（本場・積み棒除く） + (本場 × 300))
+          // 積み棒は和了者が獲得するだけで、放銃者からは引かない
+          const finalLoserScore = -(winnerScore + (honba * 300));
+          
+          scoresToCreate = data.scores.map((score) => {
+            if (score.isWinner) {
+              return {
+                roundId,
+                playerId: score.playerId,
+                scoreChange: finalWinnerScore,
+                isDealer: score.isDealer,
+                isWinner: true,
+                isRonTarget: null,
+                isTenpai: score.isTenpai ?? null,
+                han: score.han ?? null,
+                fu: score.fu ?? null,
+                yaku: score.yaku ?? [],
+              };
+            } else if (score.isRonTarget) {
+              return {
+                roundId,
+                playerId: score.playerId,
+                scoreChange: finalLoserScore,
+                isDealer: score.isDealer,
+                isWinner: false,
+                isRonTarget: true,
+                isTenpai: score.isTenpai ?? null,
+                han: null,
+                fu: null,
+                yaku: [],
+              };
+            } else {
+              return {
+                roundId,
+                playerId: score.playerId,
+                scoreChange: 0,
+                isDealer: score.isDealer,
+                isWinner: false,
+                isRonTarget: null,
+                isTenpai: score.isTenpai ?? null,
+                han: null,
+                fu: null,
+                yaku: [],
+              };
+            }
+          });
+        } else if (data.resultType === RoundResultType.TSUMO) {
+          // ツモ時: フロントエンドから送信された点数をそのまま使用
+          // フロントエンドで既に本場・積み棒を含めた最終点数が計算されている
+          scoresToCreate = data.scores.map((score) => {
+            return {
+              roundId,
+              playerId: score.playerId,
+              scoreChange: score.scoreChange,
+              isDealer: score.isDealer,
+              isWinner: score.isWinner ?? false,
+              isRonTarget: score.isRonTarget ?? null,
+              isTenpai: score.isTenpai ?? null,
+              han: score.han ?? null,
+              fu: score.fu ?? null,
+              yaku: score.yaku ?? [],
+            };
+          });
+        } else {
+          // 流局時: フロントエンドから送信された点数をそのまま使用
+          scoresToCreate = data.scores.map((score) => {
+            return {
+              roundId,
+              playerId: score.playerId,
+              scoreChange: score.scoreChange,
+              isDealer: score.isDealer,
+              isWinner: score.isWinner ?? false,
+              isRonTarget: score.isRonTarget ?? null,
+              isTenpai: score.isTenpai ?? null,
+              han: score.han ?? null,
+              fu: score.fu ?? null,
+              yaku: score.yaku ?? [],
+            };
+          });
+        }
       } else {
         // 流局時はテンパイの点数移動を計算してscoreChangeに含める
         scoresToCreate = data.scores.map((scoreData) => {
@@ -896,18 +971,14 @@ export const roundService = {
       }
 
       // 本場による点数変動を計算
-      // 注意: ツモ・ロンの場合、本場の点数は既にcalculateScoreで計算に含まれているため、
-      // ここでは追加計算しない（二重計算を防ぐ）
       const honbaScoreChanges: Map<string, number> = new Map();
+      // ツモ時・ロン時: 本場の点数は既にscoresToCreateに含まれているため、追加計算しない
 
       // 積み棒による点数変動を計算
-      // 注意: ツモ・ロンの場合、積み棒は既にcalculateScoreで計算に含まれているため、
-      // ここでは追加計算しない（二重計算を防ぐ）
-      // 流し満貫の場合のみ、ここで積み棒を計算する
       const riichiSticksScoreChanges: Map<string, number> = new Map();
       if (data.resultType === RoundResultType.NAGASHI_MANGAN) {
         // 積み棒が存在する場合のみ加算（0の場合は加算しない）
-        const riichiSticks = roundForCalculation?.riichiSticks ?? round.riichiSticks;
+        const riichiSticks = roundForCalculation?.riichiSticks ?? round.riichiSticks ?? 0;
         if (riichiSticks > 0) {
           const riichiSticksPoints = riichiSticks * 1000;
           // 流し満貫時: 流し満貫を達成した参加者が`round.riichiSticks × 1000`点を獲得
@@ -917,6 +988,7 @@ export const roundService = {
           }
         }
       }
+      // ツモ時・ロン時: 積み棒の点数は既にscoresToCreateに含まれているため、追加計算しない
       // 流局時: 積み棒による点数変動は0（次局に持ち越される）
 
       // リーチ記録、本場、積み棒の点数変動を統合
