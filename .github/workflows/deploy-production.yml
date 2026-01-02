@@ -1,9 +1,12 @@
-name: Deploy to Staging
+name: Deploy to Production (Manual)
 
 on:
-  push:
-    branches:
-      - staging   # ステージング環境のみ自動デプロイ
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type "deploy" to confirm production deployment'
+        required: true
+        type: string
 
 env:
   GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -14,6 +17,13 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      - name: Validate confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirmation }}" != "deploy" ]; then
+            echo "Error: Confirmation failed. Please type 'deploy' to proceed."
+            exit 1
+          fi
+      
       - name: Checkout code
         uses: actions/checkout@v4
       
@@ -35,17 +45,17 @@ jobs:
         run: |
           cd frontend
           docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-frontend:${{ github.sha }} .
-          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-frontend:latest .
+          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-frontend:production .
           docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-frontend:${{ github.sha }}
-          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-frontend:latest
+          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-frontend:production
       
       - name: Build and push Backend
         run: |
           cd backend
           docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:${{ github.sha }} .
-          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:latest .
+          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:production .
           docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:${{ github.sha }}
-          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:latest
+          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:production
       
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -58,11 +68,11 @@ jobs:
           echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-key.json" >> $GITHUB_ENV
       
       - name: Terraform Init
-        working-directory: infrastructure/terraform/environments/staging
+        working-directory: infrastructure/terraform/environments/production
         run: terraform init
       
       - name: Terraform Plan
-        working-directory: infrastructure/terraform/environments/staging
+        working-directory: infrastructure/terraform/environments/production
         run: terraform plan
         env:
           TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
@@ -71,11 +81,18 @@ jobs:
           TF_VAR_backend_image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:${{ github.sha }}
       
       - name: Terraform Apply
-        working-directory: infrastructure/terraform/environments/staging
+        working-directory: infrastructure/terraform/environments/production
         run: terraform apply -auto-approve
         env:
           TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
           TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
           TF_VAR_frontend_image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-frontend:${{ github.sha }}
           TF_VAR_backend_image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:${{ github.sha }}
+      
+      - name: Deployment Complete
+        run: |
+          echo "✅ Production deployment completed successfully!"
+          echo "Frontend: gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-frontend:${{ github.sha }}"
+          echo "Backend: gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:${{ github.sha }}"
+
 

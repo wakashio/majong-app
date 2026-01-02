@@ -4,11 +4,6 @@ resource "google_sql_database_instance" "db" {
   database_version = "POSTGRES_16"
   region           = var.region
 
-  # サービスネットワーキング接続の完了を待つ
-  # 注意: サービスネットワーキング接続は非同期で完了するため、
-  # 初回デプロイ時には数分かかることがあります
-  depends_on = []
-
   settings {
     tier              = var.db_tier
     availability_type = "ZONAL"

@@ -7,6 +7,10 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 5.0"
     }
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.9"
+    }
   }
 }
 
@@ -24,6 +28,14 @@ module "vpc" {
   subnet_cidr = "10.0.1.0/24"
 }
 
+# サービスネットワーキング接続の完了を待つ
+# 注意: サービスネットワーキング接続は非同期で完了するため、数分かかることがあります
+resource "time_sleep" "wait_for_vpc_connection" {
+  depends_on = [module.vpc.private_vpc_connection]
+  
+  create_duration = "120s"  # 2分待機
+}
+
 # Cloud SQLモジュール
 module "cloud_sql" {
   source = "../../modules/cloud-sql"
@@ -37,6 +49,8 @@ module "cloud_sql" {
   db_user          = var.db_user
   db_password      = var.db_password
   deletion_protection = true
+  
+  depends_on = [time_sleep.wait_for_vpc_connection]
 }
 
 # Cloud Run - フロントエンド
