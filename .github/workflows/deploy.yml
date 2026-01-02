@@ -46,59 +46,20 @@ jobs:
         working-directory: infrastructure/terraform/environments/staging
         run: terraform init
       
-      - name: Import existing VPC network (if exists)
+      - name: Import existing VPC resources
         working-directory: infrastructure/terraform/environments/staging
         run: |
-          # 状態ファイルにVPCネットワークが既に存在するか確認
-          if terraform state list | grep -q "module.vpc.google_compute_network.vpc"; then
-            echo "VPC network already exists in state"
-          else
-            # 状態に存在しない場合のみインポートを試みる
-            terraform import module.vpc.google_compute_network.vpc projects/${{ secrets.GCP_PROJECT_ID }}/global/networks/majong-app-vpc-staging || echo "VPC network import failed or already exists"
-          fi
-        continue-on-error: true
-      
-      - name: Import existing VPC subnet (if exists)
-        working-directory: infrastructure/terraform/environments/staging
-        run: |
-          # 状態ファイルにサブネットが既に存在するか確認
-          if terraform state list | grep -q "module.vpc.google_compute_subnetwork.subnet"; then
-            echo "VPC subnet already exists in state"
-          else
-            # 状態に存在しない場合のみインポートを試みる
-            terraform import module.vpc.google_compute_subnetwork.subnet projects/${{ secrets.GCP_PROJECT_ID }}/regions/${{ env.GCP_REGION }}/subnetworks/majong-app-subnet-staging || echo "VPC subnet import failed or already exists"
-          fi
-        continue-on-error: true
-      
-      - name: Import existing private IP (if exists)
-        working-directory: infrastructure/terraform/environments/staging
-        run: |
-          # 状態ファイルにプライベートIPが既に存在するか確認
-          if terraform state list | grep -q "module.vpc.google_compute_global_address.private_ip"; then
-            echo "Private IP already exists in state"
-          else
-            # 状態に存在しない場合のみインポートを試みる
-            terraform import module.vpc.google_compute_global_address.private_ip projects/${{ secrets.GCP_PROJECT_ID }}/global/addresses/majong-app-private-ip-staging || echo "Private IP import failed or already exists"
-          fi
-        continue-on-error: true
-      
-      - name: Terraform Plan
-        working-directory: infrastructure/terraform/environments/staging
-        env:
-          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
-          TF_VAR_region: ${{ env.GCP_REGION }}
-          TF_VAR_db_user: ${{ secrets.DB_USER }}
-          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
-          TF_VAR_frontend_image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-frontend:${{ github.sha }}
-          TF_VAR_backend_image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:${{ github.sha }}
-        run: |
-          terraform plan -out=tfplan || true
-          # プランでVPCネットワークの作成が検出された場合、インポートを再試行
-          if terraform show tfplan 2>/dev/null | grep -q "module.vpc.google_compute_network.vpc.*will be created"; then
-            echo "VPC network creation detected in plan, attempting import..."
-            terraform import module.vpc.google_compute_network.vpc projects/${{ secrets.GCP_PROJECT_ID }}/global/networks/majong-app-vpc-staging || echo "Import failed, will try to continue"
-            terraform plan -out=tfplan || true
-          fi
+          # VPCネットワークのインポート（既に存在する場合はエラーを無視）
+          terraform import module.vpc.google_compute_network.vpc projects/${{ secrets.GCP_PROJECT_ID }}/global/networks/majong-app-vpc-staging 2>&1 | grep -v "already managed" || true
+          
+          # サブネットのインポート
+          terraform import module.vpc.google_compute_subnetwork.subnet projects/${{ secrets.GCP_PROJECT_ID }}/regions/${{ env.GCP_REGION }}/subnetworks/majong-app-subnet-staging 2>&1 | grep -v "already managed" || true
+          
+          # プライベートIPのインポート
+          terraform import module.vpc.google_compute_global_address.private_ip projects/${{ secrets.GCP_PROJECT_ID }}/global/addresses/majong-app-private-ip-staging 2>&1 | grep -v "already managed" || true
+          
+          # サービスネットワーキング接続のインポート（存在する場合）
+          terraform import module.vpc.google_service_networking_connection.private_vpc_connection projects/${{ secrets.GCP_PROJECT_ID }}/global/networks/majong-app-vpc-staging:servicenetworking.googleapis.com 2>&1 | grep -v "already managed" || true
         continue-on-error: true
       
       - name: Terraform Apply
@@ -110,7 +71,19 @@ jobs:
           TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
           TF_VAR_frontend_image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-frontend:${{ github.sha }}
           TF_VAR_backend_image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:${{ github.sha }}
-        run: terraform apply -auto-approve tfplan || terraform apply -auto-approve
+        run: |
+          # 状態を確認して、VPCネットワークが存在するかチェック
+          if terraform state list | grep -q "module.vpc.google_compute_network.vpc"; then
+            echo "VPC network exists in state, applying all resources..."
+            terraform apply -auto-approve
+          else
+            echo "VPC network not in state, applying without VPC module first..."
+            # VPCモジュールを除外して適用
+            terraform apply -auto-approve -target=module.cloud_sql -target=module.backend -target=module.frontend -target=time_sleep.wait_for_vpc_connection || true
+            # その後、VPCを再度インポートしてから全体を適用
+            terraform import module.vpc.google_compute_network.vpc projects/${{ secrets.GCP_PROJECT_ID }}/global/networks/majong-app-vpc-staging || true
+            terraform apply -auto-approve
+          fi
       
       - name: Build and push Frontend
         run: |
