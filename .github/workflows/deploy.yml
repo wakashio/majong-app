@@ -102,6 +102,22 @@ jobs:
           
           echo "Granted roles/cloudsql.client to ${SERVICE_ACCOUNT_EMAIL}"
       
+      - name: Run Database Migrations
+        run: |
+          # Cloud Run Jobを作成/更新してマイグレーションを実行
+          gcloud run jobs deploy majong-app-migrate-staging \
+            --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:${{ github.sha }} \
+            --region ${{ env.GCP_REGION }} \
+            --set-cloudsql-instances ${{ steps.cloud_sql_connection.outputs.connection_name }} \
+            --set-env-vars "NODE_ENV=staging,DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@/majong_db?host=/cloudsql/${{ steps.cloud_sql_connection.outputs.connection_name }}" \
+            --vpc-connector staging-connector \
+            --vpc-egress all-traffic \
+            --command "npx" \
+            --args "prisma,migrate,deploy" \
+            --execute-now \
+            --wait || echo "Migration job may have failed, but continuing deployment"
+        continue-on-error: true
+      
       - name: Deploy Backend to Cloud Run
         run: |
           gcloud run deploy majong-app-backend-staging \
@@ -111,6 +127,8 @@ jobs:
             --allow-unauthenticated \
             --set-cloudsql-instances ${{ steps.cloud_sql_connection.outputs.connection_name }} \
             --set-env-vars "NODE_ENV=staging,DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@/majong_db?host=/cloudsql/${{ steps.cloud_sql_connection.outputs.connection_name }}" \
+            --vpc-connector staging-connector \
+            --vpc-egress all-traffic \
             --cpu 1 \
             --memory 512Mi \
             --min-instances 0 \

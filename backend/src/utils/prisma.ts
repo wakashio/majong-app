@@ -27,6 +27,13 @@ export function getPrismaClient(): PrismaClient {
       // セキュリティのため、パスワード部分をマスク
       const maskedUrl = databaseUrl.replace(/:[^:@]+@/, ":****@");
       console.log("DATABASE_URL (masked):", maskedUrl);
+      
+      // 接続文字列の形式を確認
+      const urlObj = new URL(databaseUrl);
+      console.log("Connection type:", urlObj.hostname ? "TCP" : "Unix socket");
+      console.log("Hostname:", urlObj.hostname || "N/A (Unix socket)");
+      console.log("Port:", urlObj.port || "N/A (Unix socket)");
+      console.log("Host parameter:", urlObj.searchParams.get("host") || "N/A");
     } else {
       console.log("Using default DATABASE_URL");
     }
