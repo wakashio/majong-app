@@ -93,7 +93,7 @@ jobs:
             --region ${{ env.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --add-cloudsql-instances ${{ steps.cloud_sql_connection.outputs.connection_name }} \
+            --set-cloudsql-instances ${{ steps.cloud_sql_connection.outputs.connection_name }} \
             --set-env-vars "NODE_ENV=production,DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@/majong_db?host=/cloudsql/${{ steps.cloud_sql_connection.outputs.connection_name }}" \
             --cpu 1 \
             --memory 512Mi \
