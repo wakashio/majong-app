@@ -1,5 +1,11 @@
 import swaggerJsdoc from "swagger-jsdoc";
 
+// 環境に応じてAPIパスを動的に設定
+const isDevelopment = process.env.NODE_ENV === "development" || !process.env.NODE_ENV;
+const apiPaths = isDevelopment
+  ? ["./src/routes/*.ts", "./src/controllers/*.ts"]
+  : ["./dist/routes/*.js", "./dist/controllers/*.js"];
+
 const options: swaggerJsdoc.Options = {
   definition: {
     openapi: "3.0.0",
@@ -119,7 +125,7 @@ const options: swaggerJsdoc.Options = {
       },
     },
   },
-  apis: ["./src/routes/*.ts", "./src/controllers/*.ts"],
+  apis: apiPaths,
 };
 
 export const swaggerSpec = swaggerJsdoc(options);
