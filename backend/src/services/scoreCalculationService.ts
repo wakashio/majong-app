@@ -3,6 +3,79 @@ import {
 } from "../types/round";
 
 /**
+ * ツモ点数表の型定義
+ */
+interface TsumoScoreTable {
+  dealer: {
+    [totalScore: number]: {
+      fromNonDealer: number;
+    };
+  };
+  nonDealer: {
+    [totalScore: number]: {
+      fromDealer: number;
+      fromNonDealer: number;
+    };
+  };
+}
+
+/**
+ * ツモ点数表
+ * 点数表の範囲: 1000点〜144000点（トリプル役満まで）
+ * 本場・積み棒は含まれず、別途計算して加算
+ */
+const tsumoScoreTable: TsumoScoreTable = {
+  dealer: {
+    1500: { fromNonDealer: 500 },
+    2100: { fromNonDealer: 700 },
+    2400: { fromNonDealer: 800 },
+    3000: { fromNonDealer: 1000 },
+    3900: { fromNonDealer: 1300 },
+    4500: { fromNonDealer: 1500 },
+    4800: { fromNonDealer: 1600 },
+    5400: { fromNonDealer: 1800 },
+    6000: { fromNonDealer: 2000 },
+    6900: { fromNonDealer: 2300 },
+    7800: { fromNonDealer: 2600 },
+    8700: { fromNonDealer: 2900 },
+    9600: { fromNonDealer: 3200 },
+    10600: { fromNonDealer: 3600 },
+    12000: { fromNonDealer: 4000 },
+    18000: { fromNonDealer: 6000 },
+    24000: { fromNonDealer: 8000 },
+    36000: { fromNonDealer: 12000 },
+    48000: { fromNonDealer: 16000 },
+    96000: { fromNonDealer: 32000 },
+    144000: { fromNonDealer: 48000 },
+  },
+  nonDealer: {
+    1100: { fromDealer: 500, fromNonDealer: 300 },
+    1500: { fromDealer: 700, fromNonDealer: 400 },
+    1600: { fromDealer: 800, fromNonDealer: 400 },
+    2000: { fromDealer: 1000, fromNonDealer: 500 },
+    2400: { fromDealer: 1200, fromNonDealer: 600 },
+    2600: { fromDealer: 1300, fromNonDealer: 700 },
+    2900: { fromDealer: 1500, fromNonDealer: 800 },
+    3200: { fromDealer: 1600, fromNonDealer: 800 },
+    3600: { fromDealer: 1800, fromNonDealer: 900 },
+    4000: { fromDealer: 2000, fromNonDealer: 1000 },
+    4400: { fromDealer: 2300, fromNonDealer: 1200 },
+    5200: { fromDealer: 2600, fromNonDealer: 1300 },
+    5600: { fromDealer: 2900, fromNonDealer: 1500 },
+    6400: { fromDealer: 3200, fromNonDealer: 1600 },
+    6800: { fromDealer: 3400, fromNonDealer: 1700 },
+    7200: { fromDealer: 3600, fromNonDealer: 1800 },
+    8000: { fromDealer: 4000, fromNonDealer: 2000 },
+    12000: { fromDealer: 6000, fromNonDealer: 3000 },
+    16000: { fromDealer: 8000, fromNonDealer: 4000 },
+    24000: { fromDealer: 12000, fromNonDealer: 6000 },
+    32000: { fromDealer: 16000, fromNonDealer: 8000 },
+    64000: { fromDealer: 32000, fromNonDealer: 16000 },
+    96000: { fromDealer: 48000, fromNonDealer: 24000 },
+  },
+};
+
+/**
  * 基本点を計算する
  * @param han - 飜数
  * @param fu - 符
@@ -55,19 +128,19 @@ export function calculateBaseScore(han: number, fu: number): number {
 }
 
 /**
- * ツモの打点を計算する
+ * ツモの打点を計算する（点数表を使用）
  * フロー:
- * 1. 和了の点数を入力（フロントエンド） - winnerScore（積み棒を含まない）
- * 2. 支払う点数を本場を含めて算出（バックエンド）
+ * 1. 和了の点数を入力（フロントエンド） - totalScore（本場・積み棒を含まない）
+ * 2. 点数表から支払い点数を取得し、本場を加算（バックエンド）
  * 3. 受け取る点数を支払う点数の合計と積み棒から算出（バックエンド）
- * @param winnerScore - 和了者の点数（積み棒を含まない）
+ * @param totalScore - 和了点（本場・積み棒を含まない）
  * @param honba - 本場
  * @param riichiSticks - 積み棒
  * @param isDealer - 親かどうか
  * @returns 和了者の打点と供託者の打点
  */
 export function calculateTsumoScore(
-  winnerScore: number,
+  totalScore: number,
   honba: number,
   riichiSticks: number,
   isDealer: boolean
@@ -80,9 +153,13 @@ export function calculateTsumoScore(
 } {
   if (isDealer) {
     // 親がツモ
-    // 2. 支払う点数を本場を含めて算出: 子1人あたり = x/3 + 100*本場
-    const fromNonDealer = winnerScore / 3 + honba * 100;
-    // 3. 受け取る点数を支払う点数の合計と積み棒から算出
+    const scoreEntry = tsumoScoreTable.dealer[totalScore];
+    if (!scoreEntry) {
+      throw new Error(`Invalid total score for dealer tsumo: ${totalScore}`);
+    }
+    // 点数表から子1人あたりの支払い点数を取得し、本場を加算
+    const fromNonDealer = scoreEntry.fromNonDealer + honba * 100;
+    // 受け取る点数を支払う点数の合計と積み棒から算出
     const actualWinnerScore = fromNonDealer * 3 + riichiSticks * 1000;
     return {
       winnerScore: actualWinnerScore,
@@ -93,12 +170,14 @@ export function calculateTsumoScore(
     };
   } else {
     // 子がツモ
-    // 2. 支払う点数を本場を含めて算出
-    // 子の支払い = x/4 + 100*本場
-    // 親の支払い = x/4*2 + 100*本場
-    const fromNonDealer = winnerScore / 4 + honba * 100;
-    const fromDealer = (winnerScore / 4) * 2 + honba * 100;
-    // 3. 受け取る点数を支払う点数の合計と積み棒から算出
+    const scoreEntry = tsumoScoreTable.nonDealer[totalScore];
+    if (!scoreEntry) {
+      throw new Error(`Invalid total score for non-dealer tsumo: ${totalScore}`);
+    }
+    // 点数表から親からの支払い点数と子からの支払い点数を取得し、本場を加算
+    const fromDealer = scoreEntry.fromDealer + honba * 100;
+    const fromNonDealer = scoreEntry.fromNonDealer + honba * 100;
+    // 受け取る点数を支払う点数の合計と積み棒から算出
     const actualWinnerScore = fromDealer + fromNonDealer * 2 + riichiSticks * 1000;
     return {
       winnerScore: actualWinnerScore,
@@ -364,5 +443,37 @@ export function calculateScore(params: {
   }
 
   throw new Error(`Unsupported resultType: ${resultType}`);
+}
+
+/**
+ * 点数表のラベル一覧を取得する
+ * @param isDealer - 親かどうか
+ * @returns 点数とラベルの配列
+ */
+export interface ScoreLabel {
+  score: number;
+  label: string;
+}
+
+export function getTsumoScoreLabels(isDealer: boolean): ScoreLabel[] {
+  if (isDealer) {
+    // 親がツモ: 「子1人あたりの点数」+「オール」
+    return Object.keys(tsumoScoreTable.dealer)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .map((score) => ({
+        score,
+        label: `${tsumoScoreTable.dealer[score].fromNonDealer}オール`,
+      }));
+  } else {
+    // 子がツモ: 「子からの点数」+「/」+「親からの点数」
+    return Object.keys(tsumoScoreTable.nonDealer)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .map((score) => ({
+        score,
+        label: `${tsumoScoreTable.nonDealer[score].fromNonDealer}/${tsumoScoreTable.nonDealer[score].fromDealer}`,
+      }));
+  }
 }
 

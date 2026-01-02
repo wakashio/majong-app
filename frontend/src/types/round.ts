@@ -242,6 +242,15 @@ export interface CalculateNextSettingsResponse {
   };
 }
 
+export interface ScoreLabel {
+  score: number;
+  label: string;
+}
+
+export interface TsumoScoreLabelsResponse {
+  data: ScoreLabel[];
+}
+
 export interface ErrorResponse {
   error: {
     code: string;

@@ -16,6 +16,7 @@ import type {
   CalculateScoreResponse,
   CalculateNextSettingsRequest,
   CalculateNextSettingsResponse,
+  TsumoScoreLabelsResponse,
 } from "../types/round";
 
 export async function getRounds(
@@ -447,6 +448,42 @@ export async function calculateNextSettings(
 
     const result = await response.json();
     return result as CalculateNextSettingsResponse;
+  } catch (error) {
+    return {
+      error: {
+        code: "NETWORK_ERROR",
+        message: error instanceof Error ? error.message : "Unknown error occurred",
+      },
+    } as ErrorResponse;
+  }
+}
+
+export async function getTsumoScoreLabels(
+  isDealer: boolean
+): Promise<TsumoScoreLabelsResponse | ErrorResponse> {
+  try {
+    const url = new URL(`${API_BASE_URL}/api/rounds/tsumo-score-labels`);
+    url.searchParams.append("isDealer", isDealer.toString());
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        error: {
+          code: "HTTP_ERROR",
+          message: `HTTP error! status: ${response.status}`,
+        },
+      }));
+      return errorData as ErrorResponse;
+    }
+
+    const data = await response.json();
+    return data as TsumoScoreLabelsResponse;
   } catch (error) {
     return {
       error: {

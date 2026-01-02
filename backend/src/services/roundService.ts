@@ -16,7 +16,6 @@ import {
   isDealerRenchan,
   calculateNextRoundNumber,
 } from "./riichiHonbaCalculationService";
-import { calculateScore } from "./scoreCalculationService";
 
 
 
@@ -819,53 +818,20 @@ export const roundService = {
         yaku: string[];
       }>;
 
-      // ツモ・ロンの場合: 和了者の点数から自動計算
-      if (
-        data.resultType === RoundResultType.TSUMO ||
-        data.resultType === RoundResultType.RON
-      ) {
-        const winnerScoreData = data.scores.find((s) => s.isWinner === true);
-        if (!winnerScoreData || winnerScoreData.scoreChange === undefined || winnerScoreData.scoreChange === null) {
-          throw new Error("winner scoreChange is required for TSUMO or RON");
-        }
-
-        const winnerPlayerId = winnerScoreData.playerId;
-        const winnerScore = winnerScoreData.scoreChange;
-        const ronTargetPlayerId = data.resultType === RoundResultType.RON
-          ? data.scores.find((s) => s.isRonTarget === true)?.playerId
-          : undefined;
-
-        if (!roundForCalculation) {
-          throw new Error("Failed to get round for calculation");
-        }
-
-        // 和了者の点数から自動計算
-        const calculatedScores = calculateScore({
-          resultType: data.resultType,
-          winnerPlayerId,
-          ronTargetPlayerId,
-          winnerScore,
-          yaku: winnerScoreData.yaku,
-          dealerPlayerId: round.dealerPlayerId,
-          playerIds,
-          honba: roundForCalculation.honba,
-          riichiSticks: roundForCalculation.riichiSticks,
-        });
-
-        // 計算結果をscoresToCreateに変換
-        scoresToCreate = calculatedScores.map((calculated) => {
-          const originalScore = data.scores?.find((s) => s.playerId === calculated.playerId);
+      // フロントエンドから送信された点数をそのまま使用
+      if (data.scores && data.scores.length > 0) {
+        scoresToCreate = data.scores.map((score) => {
           return {
             roundId,
-            playerId: calculated.playerId,
-            scoreChange: calculated.scoreChange,
-            isDealer: calculated.isDealer,
-            isWinner: calculated.isWinner,
-            isRonTarget: calculated.isRonTarget ?? null,
-            isTenpai: originalScore?.isTenpai ?? null,
-            han: calculated.han ?? null,
-            fu: calculated.fu ?? null,
-            yaku: calculated.yaku ?? [],
+            playerId: score.playerId,
+            scoreChange: score.scoreChange,
+            isDealer: score.isDealer,
+            isWinner: score.isWinner ?? false,
+            isRonTarget: score.isRonTarget ?? null,
+            isTenpai: score.isTenpai ?? null,
+            han: score.han ?? null,
+            fu: score.fu ?? null,
+            yaku: score.yaku ?? [],
           };
         });
       } else {

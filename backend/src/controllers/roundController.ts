@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { roundService } from "../services/roundService";
-import { calculateScore } from "../services/scoreCalculationService";
+import { calculateScore, getTsumoScoreLabels } from "../services/scoreCalculationService";
 import {
   calculateNextRoundSettings,
   calculateNextRoundNumber,
@@ -1239,6 +1239,23 @@ export const roundController = {
           return;
         }
       }
+      const errorResponse: ErrorResponse = {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Internal server error",
+        },
+      };
+      res.status(500).json(errorResponse);
+    }
+  },
+
+  async getTsumoScoreLabels(req: Request, res: Response): Promise<void> {
+    try {
+      const isDealer = req.query.isDealer === "true";
+      const labels = getTsumoScoreLabels(isDealer);
+      res.json({ data: labels });
+    } catch (error) {
+      console.error("Error getting tsumo score labels:", error);
       const errorResponse: ErrorResponse = {
         error: {
           code: "INTERNAL_ERROR",
