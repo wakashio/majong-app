@@ -1,5 +1,6 @@
 # Cloud Runモジュール
 resource "google_cloud_run_service" "service" {
+  count    = var.create_service ? 1 : 0
   name     = "${var.service_name}-${var.environment}"
   location = var.region
 
@@ -32,6 +33,8 @@ resource "google_cloud_run_service" "service" {
       annotations = {
         "autoscaling.knative.dev/maxScale" = var.max_instances
         "autoscaling.knative.dev/minScale" = var.min_instances
+        # 初回デプロイ時、イメージが存在しない場合でもサービスを作成できるようにする
+        "run.googleapis.com/launch-stage" = "BETA"
       }
     }
   }
@@ -40,11 +43,23 @@ resource "google_cloud_run_service" "service" {
     percent         = 100
     latest_revision = true
   }
+
+  lifecycle {
+    # イメージが存在しない場合でもリソースを作成できるようにする
+    # 実際のイメージは後でビルド・プッシュしてから更新する
+    ignore_changes = [
+      template[0].spec[0].containers[0].image,
+      template[0].metadata[0].annotations
+    ]
+    # リビジョンの失敗を無視する（初回デプロイ時）
+    create_before_destroy = true
+  }
 }
 
 resource "google_cloud_run_service_iam_member" "public_access" {
-  service  = google_cloud_run_service.service.name
-  location = google_cloud_run_service.service.location
+  count    = var.create_service ? 1 : 0
+  service  = google_cloud_run_service.service[0].name
+  location = google_cloud_run_service.service[0].location
   role     = "roles/run.invoker"
   member   = "allUsers"
 }

@@ -10,6 +10,10 @@ RUN npm ci
 # ソースコードをコピー
 COPY . .
 
+# ビルド時の環境変数（ARGで受け取る）
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
 # ビルド
 RUN npm run build
 
@@ -19,12 +23,14 @@ FROM nginx:alpine
 # ビルド成果物をコピー
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Nginx設定ファイルをコピー（必要に応じて）
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
+# 環境変数をHTMLに注入するスクリプトをコピー
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 # ポートを公開
 EXPOSE 80
 
-# Nginxを起動
+# エントリーポイントを設定
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]
 

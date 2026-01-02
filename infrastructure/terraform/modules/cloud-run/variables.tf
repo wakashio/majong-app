@@ -61,3 +61,9 @@ variable "env_vars" {
   default     = {}
 }
 
+variable "create_service" {
+  description = "Whether to create the Cloud Run service (set to false for initial deployment without images)"
+  type        = bool
+  default     = true
+}
+

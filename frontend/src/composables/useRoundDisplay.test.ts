@@ -63,7 +63,15 @@ describe("useRoundDisplay", () => {
         riichiSticks: 0,
         resultType: null,
         dealerPlayerId: "player-1",
+        dealerPlayer: {
+          id: "player-1",
+          name: "Player 1",
+        },
+        specialDrawType: null,
+        startedAt: null,
+        endedAt: null,
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
       const label = getRoundLabel(round);
@@ -77,6 +85,14 @@ describe("useRoundDisplay", () => {
         roundNumber: 2,
         wind: Wind.EAST,
         honba: 1,
+        dealerPlayer: {
+          id: "player-1",
+          name: "Player 1",
+        },
+        specialDrawType: null,
+        startedAt: null,
+        endedAt: null,
+        updatedAt: new Date().toISOString(),
         riichiSticks: 0,
         resultType: null,
         dealerPlayerId: "player-1",

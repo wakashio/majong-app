@@ -13,3 +13,8 @@ output "network_name" {
   value       = google_compute_network.vpc.name
 }
 
+output "private_vpc_connection" {
+  description = "Private VPC connection for service networking"
+  value       = google_service_networking_connection.private_vpc_connection
+}
+

@@ -694,7 +694,54 @@ Write-Host "このファイルの内容をGitHub SecretsのGCP_SA_KEYに設定�
 
 ### ステップ3: Secret Managerの設定（オプション）
 
-データベースパスワードをSecret Managerに保存する場合:
+データベースパスワードをSecret Managerに保存する方法は2つあります:
+- **GUI（Google Cloud Console）**: ブラウザから操作する方法（推奨）
+- **CLI（コマンドライン）**: ターミナルから操作する方法
+
+**注意**: Secret Managerを使用しない場合は、後でTerraformの変数として直接設定します。
+
+#### 方法1: GUI（Google Cloud Console）でSecret Managerにシークレットを作成
+
+1. **Secret Managerページにアクセス**
+   - Google Cloud Consoleで、作成したプロジェクトを選択
+   - 左側のメニューから「セキュリティ」>「Secret Manager」を選択
+   - または、[Secret Managerページ](https://console.cloud.google.com/security/secret-manager) に直接アクセス
+
+2. **シークレットを作成**
+   - ページ上部の「シークレットを作成」ボタンをクリック
+   - 以下の情報を入力:
+     - **名前**: `db-password`
+     - **シークレット値**: データベースパスワードを入力
+       - 強力なパスワードを生成する場合は、後述の「パスワード生成方法」を参照
+     - **レプリケーション**: 「自動」を選択（デフォルト）
+   - 「シークレットを作成」ボタンをクリック
+
+3. **パスワード生成方法（オプション）**
+   - 強力なパスワードを生成する場合は、以下のいずれかの方法を使用:
+     - **オンラインパスワードジェネレーター**: 任意のオンラインツールを使用
+     - **CLIで生成**: 後述のCLI手順のパスワード生成コマンドを実行
+     - **手動で生成**: 32文字以上のランダムな文字列を作成
+
+4. **シークレットの確認**
+   - 作成後、Secret Managerの一覧に`db-password`が表示されます
+   - シークレット名をクリックして詳細を確認できます
+   - **重要**: シークレット値は表示されません（セキュリティのため）
+
+5. **シークレット値の取得（確認用）**
+   - シークレットの詳細ページで「バージョンを表示」をクリック
+   - 最新バージョンを選択
+   - 「シークレット値を表示」ボタンをクリックして値を確認
+   - **注意**: 値は一度だけ表示されます。必要に応じてメモしておきます
+
+**スクリーンショットの参考箇所:**
+- 左側メニューの「セキュリティ」>「Secret Manager」: ナビゲーションメニュー内
+- 「シークレットを作成」ボタン: ページ上部
+- シークレット作成フォーム: モーダルウィンドウ
+- シークレット一覧: メインページ
+
+#### 方法2: CLI（コマンドライン）でSecret Managerにシークレットを作成
+
+**Bash/Git Bashの場合:**
 
 ```bash
 # データベースパスワードを生成（強力なパスワード）
@@ -710,7 +757,25 @@ echo -n "${DB_PASSWORD}" | gcloud secrets create db-password \
 gcloud secrets versions access latest --secret=db-password --project=${PROJECT_ID}
 ```
 
-**注意**: Secret Managerを使用しない場合は、後でTerraformの変数として直接設定します。
+**PowerShellの場合:**
+
+```powershell
+# データベースパスワードを生成（強力なパスワード）
+$DB_PASSWORD = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 32 | ForEach-Object {[char]$_})
+Write-Host "生成されたパスワード: $DB_PASSWORD"
+
+# Secret Managerに保存
+echo -n $DB_PASSWORD | gcloud secrets create db-password `
+  --data-file=- `
+  --project=$PROJECT_ID
+
+# 確認
+gcloud secrets versions access latest --secret=db-password --project=$PROJECT_ID
+```
+
+**注意**: 
+- 生成されたパスワードは安全な場所に保存してください。後でTerraformの設定で使用します。
+- Secret Managerに保存したパスワードは、後でTerraformやアプリケーションから参照できます。
 
 ---
 
@@ -799,6 +864,18 @@ terraform apply -auto-approve
 ```
 
 **所要時間**: インフラの作成には10-20分かかることがあります。特にCloud SQLインスタンスの作成には時間がかかります。
+
+**各リソースの作成時間の目安:**
+- VPCネットワーク: 数秒〜1分
+- サービスネットワーキング接続: 2分（`time_sleep`で待機）
+- Cloud SQLインスタンス: **5-15分**（最も時間がかかります）
+  - プライベートIPの割り当て
+  - データベースエンジンの初期化
+  - ディスクの準備
+  - これらは正常な処理で、完了まで待機してください
+- Cloud Runサービス: 1-2分（イメージが存在する場合）
+
+**注意**: Cloud SQLインスタンスの作成中は、ターミナルに「Still creating...」というメッセージが表示され続けますが、これは正常です。10-15分程度かかることがありますので、そのまま待機してください。中断しないでください。
 
 #### 5.2 作成されたリソースの確認
 

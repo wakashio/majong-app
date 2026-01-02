@@ -33,7 +33,7 @@ module "cloud_sql" {
   db_tier          = "db-f1-micro"
   disk_size        = 10
   disk_type        = "PD_HDD"
-  vpc_network_id   = module.vpc.network_name
+  vpc_network_id   = module.vpc.vpc_id
   db_user          = var.db_user
   db_password      = var.db_password
   deletion_protection = true

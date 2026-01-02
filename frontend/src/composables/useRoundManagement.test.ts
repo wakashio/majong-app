@@ -56,7 +56,15 @@ describe("useRoundManagement", () => {
           riichiSticks: 0,
           resultType: null,
           dealerPlayerId: "player-1",
+          dealerPlayer: {
+            id: "player-1",
+            name: "Player 1",
+          },
+          specialDrawType: null,
+          startedAt: null,
+          endedAt: null,
           createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         },
         {
           id: "round-2",
@@ -67,7 +75,15 @@ describe("useRoundManagement", () => {
           riichiSticks: 0,
           resultType: null,
           dealerPlayerId: "player-1",
+          dealerPlayer: {
+            id: "player-1",
+            name: "Player 1",
+          },
+          specialDrawType: null,
+          startedAt: null,
+          endedAt: null,
           createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         },
       ];
       expect(getNextRoundNumber(rounds)).toBe(4);
