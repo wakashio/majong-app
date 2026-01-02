@@ -52,6 +52,18 @@
 
 ## アイデア一覧
 
+### 2026-01-02 ステージング環境の500エラー問題: Cloud RunからCloud SQLへの接続エラーを解決する
+
+### [議論完了] ステージング環境の500エラー問題: Cloud RunからCloud SQLへの接続エラーを解決する
+
+- **内容**: ステージング環境でフロントエンドからAPIを実行すると500エラーが発生している。ログを確認した結果、Cloud RunからCloud SQL（プライベートIP `10.103.0.3`）への接続がタイムアウトしている（レイテンシー127秒や0.6-0.8秒）。原因は、Cloud SQLがプライベートIPのみで設定されているが、Cloud RunにVPCコネクタが設定されていないため、プライベートIP接続ができないことである。解決方法として、以下の2つの選択肢がある: (1) Cloud SQL Proxyを使用する方法（推奨・簡単）: `--add-cloudsql-instances`フラグを使用してCloud SQL Proxy経由で接続する。接続文字列は`/cloudsql/CONNECTION_NAME`形式または`localhost`形式を使用する。(2) VPCコネクタを設定する方法（複雑）: VPCコネクタを作成し、Cloud Runサービスに設定する。プライベートIPで直接接続する。
+- **提案者**: ユーザー
+- **優先度**: 高
+- **関連機能**: インフラ設定、Cloud Run、Cloud SQL、データベース接続、デプロイ設定、`.github/workflows/deploy.yml`、`.github/workflows/deploy-production.yml`、`backend/src/utils/prisma.ts`、`backend/src/middleware/errorHandler.ts`
+- **備考**: 現在の設定では、Cloud SQLはプライベートIPのみ（`ipv4_enabled = false`）で設定されており、DATABASE_URLは`postgresql://majong_user:****@10.103.0.3:5432/majong_db`形式となっている。エラーログでは、`/api/sessions`と`/api/hanchans`で500エラーが発生し、レスポンスサイズが295バイト（エラーレスポンス）となっている。エラーハンドリングミドルウェアとPrismaクライアントのログ改善は既に実装済み。Cloud SQL Proxyを使用する場合、接続名（`PROJECT_ID:REGION:INSTANCE_NAME`形式）を取得し、`--add-cloudsql-instances`フラグで指定する必要がある。接続文字列は`postgresql://user:password@/database?host=/cloudsql/CONNECTION_NAME`形式に変更する。VPCコネクタを使用する場合、VPCコネクタの作成とCloud Runサービスへの設定が必要。
+- **ステータス**: 議論完了 → 議事録に移行済み
+- **議事録参照**: `11-meeting-notes.md` (2026-01-02 ステージング環境の500エラー問題: Cloud RunからCloud SQLへの接続エラーを解決する)
+
 ### 2026-01-02 e2eテストがすべてエラーになっている件に対応する
 
 ### [議論待ち] e2eテストがすべてエラーになっている件に対応する

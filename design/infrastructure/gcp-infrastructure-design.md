@@ -134,8 +134,9 @@
 
 #### 接続方法
 
-- Cloud SQL Proxyを使用（セキュア接続）
-- プライベートIP接続（VPC内）
+- **Cloud SQL Proxyを使用（推奨・実装済み）**: Cloud RunからCloud SQLへの接続にCloud SQL Proxyを使用。`--add-cloudsql-instances`フラグで有効化し、Unixソケット経由で接続する。
+- **接続文字列形式**: `postgresql://user:password@/database?host=/cloudsql/CONNECTION_NAME`
+- **詳細**: `design/infrastructure/cloud-sql-proxy-connection.md`を参照
 
 #### コスト
 
@@ -463,9 +464,10 @@ jobs:
 
 ### ネットワークセキュリティ
 
-- Cloud SQLはプライベートIPのみで接続
-- Cloud RunはVPCコネクタ経由でCloud SQLに接続
+- Cloud SQLはプライベートIPのみで接続（`ipv4_enabled = false`）
+- Cloud RunはCloud SQL Proxy経由でCloud SQLに接続（`--add-cloudsql-instances`フラグを使用）
 - 外部からの直接アクセスはCloud Load Balancer経由のみ
+- **詳細**: `design/infrastructure/cloud-sql-proxy-connection.md`を参照
 
 ---
 

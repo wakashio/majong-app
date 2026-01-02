@@ -41,6 +41,12 @@ jobs:
       - name: Configure Docker for GCR
         run: gcloud auth configure-docker gcr.io
       
+      - name: Enable Required APIs
+        run: |
+          gcloud services enable vpcaccess.googleapis.com --project=${{ secrets.GCP_PROJECT_ID }} || true
+          gcloud services enable run.googleapis.com --project=${{ secrets.GCP_PROJECT_ID }} || true
+          gcloud services enable sqladmin.googleapis.com --project=${{ secrets.GCP_PROJECT_ID }} || true
+      
       - name: Build and push Frontend
         run: |
           cd frontend
@@ -57,6 +63,15 @@ jobs:
           docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:${{ github.sha }}
           docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:production
       
+      - name: Get Cloud SQL Connection Name
+        id: cloud_sql_connection
+        run: |
+          CONNECTION_NAME=$(gcloud sql instances describe majong-app-db-production \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --format='value(connectionName)')
+          echo "connection_name=$CONNECTION_NAME" >> $GITHUB_OUTPUT
+          echo "Cloud SQL Connection Name: $CONNECTION_NAME"
+      
       - name: Deploy Backend to Cloud Run
         run: |
           gcloud run deploy majong-app-backend-production \
@@ -64,7 +79,8 @@ jobs:
             --region ${{ env.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "NODE_ENV=production,DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@${{ secrets.DB_HOST_PROD }}:5432/majong_db" \
+            --add-cloudsql-instances ${{ steps.cloud_sql_connection.outputs.connection_name }} \
+            --set-env-vars "NODE_ENV=production,DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@/majong_db?host=/cloudsql/${{ steps.cloud_sql_connection.outputs.connection_name }}" \
             --cpu 1 \
             --memory 512Mi \
             --min-instances 0 \

@@ -6,6 +6,7 @@ import hanchanRoutes from "./routes/hanchanRoutes";
 import roundRoutes from "./routes/roundRoutes";
 import sessionRoutes from "./routes/sessionRoutes";
 import { swaggerSpec } from "./config/swagger";
+import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
 
@@ -23,6 +24,9 @@ app.use("/api/players", playerRoutes);
 app.use("/api/hanchans", hanchanRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use("/api", roundRoutes);
+
+// エラーハンドリングミドルウェアは最後に追加
+app.use(errorHandler);
 
 export default app;
 

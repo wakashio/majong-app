@@ -32,6 +32,34 @@
 
 ## 議事録一覧
 
+### 2026-01-02 ステージング環境の500エラー問題: Cloud RunからCloud SQLへの接続エラーを解決する
+
+### [未反映] ステージング環境の500エラー問題: Cloud RunからCloud SQLへの接続エラーを解決する
+
+- **元のアイデア**: `12-ideas.md` (2026-01-02 ステージング環境の500エラー問題: Cloud RunからCloud SQLへの接続エラーを解決する)
+- **議論内容**:
+  - 問題の確認: ステージング環境でフロントエンドからAPIを実行すると500エラーが発生。ログを確認した結果、Cloud RunからCloud SQL（プライベートIP `10.103.0.3`）への接続がタイムアウトしている（レイテンシー127秒や0.6-0.8秒）
+  - 原因の特定: Cloud SQLがプライベートIPのみで設定されているが、Cloud RunにVPCコネクタが設定されていないため、プライベートIP接続ができない
+  - 解決方法の比較: (1) Cloud SQL Proxyを使用する方法（推奨・簡単）、(2) VPCコネクタを設定する方法（複雑）
+  - Cloud SQL Proxyのメリット: 実装が簡単、VPCコネクタ不要、セキュアな接続、接続管理が自動、GCPの推奨方法
+  - VPCコネクタのデメリット: VPCコネクタの作成が必要（追加リソース）、設定が複雑、コストが発生する可能性
+- **決定事項**:
+  - **解決方法**: Cloud SQL Proxyを使用する方法を採用
+  - **実装内容**:
+    1. Cloud SQLインスタンスの接続名を取得（`PROJECT_ID:REGION:INSTANCE_NAME`形式）
+    2. デプロイ時に`--add-cloudsql-instances`フラグを追加
+    3. DATABASE_URLを`postgresql://user:password@/database?host=/cloudsql/CONNECTION_NAME`形式に変更
+  - **対象環境**: ステージング環境と本番環境の両方に対応
+- **実装方針**:
+  - デプロイワークフロー（`.github/workflows/deploy.yml`、`.github/workflows/deploy-production.yml`）を修正
+  - Cloud SQLインスタンスの接続名を取得するステップを追加
+  - `gcloud run deploy`コマンドに`--add-cloudsql-instances`フラグを追加
+  - DATABASE_URLの接続文字列を`/cloudsql/CONNECTION_NAME`形式に変更
+  - Prismaクライアントの設定は変更不要（接続文字列の変更のみ）
+- **反映先**: `.github/workflows/deploy.yml`、`.github/workflows/deploy-production.yml`、デプロイ設定ドキュメント
+- **優先度**: 高
+- **備考**: Cloud SQLインスタンス名は`majong-app-db-staging`（ステージング）、`majong-app-db-production`（本番）。接続名は`PROJECT_ID:REGION:INSTANCE_NAME`形式（例: `majong-app-staging:us-west1:majong-app-db-staging`）。Terraformのoutputsに`connection_name`が定義されているが、GitHub Actionsのデプロイワークフローでは直接取得する必要がある。
+
 ### 2026-01-02 GCPインフラ設計
 
 ### [反映済み] GCPインフラ設計
