@@ -67,6 +67,12 @@ jobs:
           echo "url=$BACKEND_URL" >> $GITHUB_OUTPUT
           echo "Backend URL: $BACKEND_URL"
       
+      - name: Update Backend Environment Variables with API URL
+        run: |
+          gcloud run services update majong-app-backend-staging \
+            --region ${{ env.GCP_REGION }} \
+            --update-env-vars "API_BASE_URL=${{ steps.backend_url.outputs.url }}"
+      
       - name: Deploy Frontend to Cloud Run
         run: |
           gcloud run deploy majong-app-frontend-staging \

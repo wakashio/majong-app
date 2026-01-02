@@ -6,6 +6,28 @@ const apiPaths = isDevelopment
   ? ["./src/routes/*.ts", "./src/controllers/*.ts"]
   : ["./dist/routes/*.js", "./dist/controllers/*.js"];
 
+// サーバーURLを環境変数から取得（Cloud Run環境では自動設定される）
+const getServerUrl = (): string => {
+  // 環境変数から取得を試みる
+  if (process.env.API_BASE_URL) {
+    return process.env.API_BASE_URL;
+  }
+  if (process.env.CLOUD_RUN_SERVICE_URL) {
+    return process.env.CLOUD_RUN_SERVICE_URL;
+  }
+  // デフォルトはlocalhost
+  return "http://localhost:3000";
+};
+
+const serverUrl = getServerUrl();
+const serverDescription = isDevelopment
+  ? "開発環境"
+  : process.env.NODE_ENV === "staging"
+    ? "ステージング環境"
+    : process.env.NODE_ENV === "production"
+      ? "本番環境"
+      : "実行環境";
+
 const options: swaggerJsdoc.Options = {
   definition: {
     openapi: "3.0.0",
@@ -16,8 +38,8 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: "http://localhost:3000",
-        description: "開発環境",
+        url: serverUrl,
+        description: serverDescription,
       },
     ],
     components: {
