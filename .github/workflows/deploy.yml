@@ -62,6 +62,20 @@ jobs:
           echo "connection_name=$CONNECTION_NAME" >> $GITHUB_OUTPUT
           echo "Cloud SQL Connection Name: $CONNECTION_NAME"
       
+      - name: Grant Cloud SQL Client Permission to Cloud Run Service Account
+        run: |
+          # Get the default Compute Engine service account email
+          PROJECT_NUMBER=$(gcloud projects describe ${{ secrets.GCP_PROJECT_ID }} --format='value(projectNumber)')
+          SERVICE_ACCOUNT_EMAIL="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+          
+          # Grant Cloud SQL Client role to the service account
+          gcloud projects add-iam-policy-binding ${{ secrets.GCP_PROJECT_ID }} \
+            --member="serviceAccount:${SERVICE_ACCOUNT_EMAIL}" \
+            --role="roles/cloudsql.client" \
+            --condition=None || echo "Permission may already be granted or service account may not exist"
+          
+          echo "Granted roles/cloudsql.client to ${SERVICE_ACCOUNT_EMAIL}"
+      
       - name: Deploy Backend to Cloud Run
         run: |
           gcloud run deploy majong-app-backend-staging \
