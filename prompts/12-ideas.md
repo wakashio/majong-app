@@ -52,6 +52,17 @@
 
 ## アイデア一覧
 
+### 2026-01-02 e2eテストがすべてエラーになっている件に対応する
+
+### [議論待ち] e2eテストがすべてエラーになっている件に対応する
+
+- **内容**: e2eテストがすべてエラーになっている問題に対応する。現在、Playwrightのブラウザ（chromium、firefox、webkit）がインストールされていないため、すべてのe2eテストが失敗している。エラーメッセージには「npx playwright install」を実行するように指示されている。ブラウザをインストールすることで、e2eテストが正常に実行できるようになる。
+- **提案者**: ユーザー
+- **優先度**: 高
+- **関連機能**: e2eテスト、Playwright、テスト環境、`frontend/e2e/vue.spec.ts`、`playwright.config.ts`
+- **備考**: 現在、45個のテストがすべて失敗しており、エラーメッセージは「Executable doesn't exist at C:\Users\wakai\AppData\Local\ms-playwright\chromium-1200\chrome-win64\chrome.exe」などとなっている。`npx playwright install`コマンドを実行してブラウザをインストールする必要がある。また、CI/CD環境でも同様の問題が発生しないように、`package.json`のセットアップスクリプトにブラウザインストールコマンドを含めることを検討する。
+- **対応状況**: Playwrightブラウザのインストールは完了。最初のテスト（`visits the app root url`）のセレクタエラーを修正（`page.getByText('麻雀記録アプリ')`を使用）。残りのテストは、バックエンドサーバーの起動やテストデータの準備が必要なため、別途対応が必要。
+
 ### 2026-01-02 Teratermを使ったGCPへのデプロイ設定を行いたい。そのためにまず、インフラの設計を行いたい。
 
 ### [議論完了] Teratermを使ったGCPへのデプロイ設定を行いたい。そのためにまず、インフラの設計を行いたい。
