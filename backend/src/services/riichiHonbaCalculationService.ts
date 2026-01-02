@@ -54,15 +54,13 @@ export function isDealerRenchan(
  * @param resultType - 結果タイプ
  * @param isDealerWinner - 親が和了したかどうか
  * @param isDealerTenpai - 親がテンパイしているかどうか（流局時のみ有効）
- * @param isAllNoten - 全員ノーテンかどうか（流局時のみ有効）
  * @returns 次局の本場数
  */
 export function calculateNextHonba(
   currentHonba: number,
   resultType: RoundResultType,
   isDealerWinner: boolean,
-  isDealerTenpai?: boolean,
-  isAllNoten?: boolean
+  isDealerTenpai?: boolean
 ): number {
   // 親が連荘する場合（親が和了した場合、または流局で親がテンパイした場合）
   if (isDealerRenchan(resultType, isDealerWinner, isDealerTenpai)) {
@@ -76,14 +74,14 @@ export function calculateNextHonba(
   ) {
     return 0;
   }
-  // 流局で全員ノーテンの場合（連荘ではないが本場は増加）
+  // 流局で親がノーテンの場合（連荘ではないが本場は増加）
   if (
     (resultType === RoundResultType.DRAW || resultType === RoundResultType.SPECIAL_DRAW) &&
-    isAllNoten === true
+    isDealerTenpai !== true
   ) {
     return currentHonba + 1;
   }
-  // 流局で親がノーテンで全員ノーテンでない場合
+  // その他の場合（流局で親がテンパイしているが連荘判定でfalseになった場合など）
   return currentHonba;
 }
 
@@ -119,7 +117,6 @@ export function calculateNextRoundSettings(params: {
   resultType: RoundResultType;
   isDealerWinner: boolean;
   isDealerTenpai?: boolean;
-  isAllNoten?: boolean;
 }): NextRoundSettings {
   const {
     currentRiichiSticks,
@@ -127,7 +124,6 @@ export function calculateNextRoundSettings(params: {
     resultType,
     isDealerWinner,
     isDealerTenpai,
-    isAllNoten,
   } = params;
 
   const nextRiichiSticks = calculateNextRiichiSticks(
@@ -138,8 +134,7 @@ export function calculateNextRoundSettings(params: {
     currentHonba,
     resultType,
     isDealerWinner,
-    isDealerTenpai,
-    isAllNoten
+    isDealerTenpai
   );
   const isRenchan = calculateIsRenchan(
     resultType,

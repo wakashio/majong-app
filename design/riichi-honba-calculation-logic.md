@@ -55,8 +55,7 @@
 
 3. **通常の流局（荒牌流局）**
    - 親がテンパイしている場合: 次局の本場 = 現在の本場 + 1、連荘になる（`isRenchan: true`）
-   - 親がノーテンで全員ノーテンの場合: 次局の本場 = 現在の本場 + 1、連荘にならない（`isRenchan: false`）
-   - 親がノーテンで全員ノーテンでない場合: 次局の本場 = 現在の本場（変更なし）、連荘にならない（`isRenchan: false`）
+   - 親がノーテンの場合: 次局の本場 = 現在の本場 + 1、連荘にならない（`isRenchan: false`）
 
 4. **流し満貫**
    - 次局の本場 = 0（リセット）
@@ -64,8 +63,7 @@
 
 5. **特殊流局（四槓、四風、九種九牌）**
    - 親がテンパイしている場合: 次局の本場 = 現在の本場 + 1、連荘になる（`isRenchan: true`）
-   - 親がノーテンで全員ノーテンの場合: 次局の本場 = 現在の本場 + 1、連荘にならない（`isRenchan: false`）
-   - 親がノーテンで全員ノーテンでない場合: 次局の本場 = 現在の本場（変更なし）、連荘にならない（`isRenchan: false`）
+   - 親がノーテンの場合: 次局の本場 = 現在の本場 + 1、連荘にならない（`isRenchan: false`）
 
 ## 計算式
 
@@ -96,8 +94,7 @@ function calculateNextHonba(
   currentHonba: number,
   resultType: RoundResultType,
   isDealerWinner: boolean,
-  isDealerTenpai?: boolean,
-  isAllNoten?: boolean
+  isDealerTenpai?: boolean
 ): number {
   // 親が連荘する場合（親が和了した場合、または流局で親がテンパイした場合）
   if (isDealerRenchan(resultType, isDealerWinner, isDealerTenpai)) {
@@ -111,14 +108,14 @@ function calculateNextHonba(
   ) {
     return 0;
   }
-  // 流局で全員ノーテンの場合（連荘ではないが本場は増加）
+  // 流局で親がノーテンの場合（連荘ではないが本場は増加）
   if (
     (resultType === RoundResultType.DRAW || resultType === RoundResultType.SPECIAL_DRAW) &&
-    isAllNoten === true
+    isDealerTenpai !== true
   ) {
     return currentHonba + 1;
   }
-  // 流局で親がノーテンで全員ノーテンでない場合
+  // その他の場合
   return currentHonba;
 }
 ```
@@ -213,25 +210,19 @@ function calculateIsRenchan(
 
 - `calculateNextHonba`関数を修正
   - 共通関数`isDealerRenchan`を使用して連荘判定を行う
-  - 全員ノーテン流局の場合も本場+1を返すように修正（連荘判定とは独立）
-  - 全参加者のテンパイ情報を受け取るパラメータ（`isAllNoten`）を追加
+  - 流局で親がノーテンの場合も本場+1を返すように修正（連荘判定とは独立）
   - 特殊流局で親がテンパイした場合も本場を+1する（実装済み、設計ドキュメントを更新）
 - `calculateIsRenchan`関数を修正
   - 共通関数`isDealerRenchan`を使用してロジックを簡潔化
-- `calculateNextRoundSettings`関数を修正
-  - `isAllNoten`パラメータを追加し、`calculateNextHonba`関数に渡す
 
 ### 局作成時の処理
 
 - `backend/src/services/roundService.ts`の`create`関数を修正
   - 前局を取得（同じ`hanchanId`で、`roundNumber`が1つ前、または連荘の場合は同じ`roundNumber`で`honba`が1つ前）
   - 前局が存在する場合、前局の結果から連荘を判定
-  - 前局の`scores`から全参加者のテンパイ情報を取得し、全員ノーテンかどうかを判定
-  - 連荘に応じて本場を設定（`calculateNextHonba`関数を使用、`isAllNoten`パラメータを渡す）
+  - 前局の`scores`から親のテンパイ情報を取得
+  - 連荘に応じて本場を設定（`calculateNextHonba`関数を使用）
   - 前局が存在しない場合（1局目など）は、デフォルト値（本場0）を使用
-- `backend/src/services/roundService.ts`の`endRound`関数を修正
-  - 全参加者のテンパイ情報を取得し、全員ノーテンかどうかを判定
-  - `calculateNextHonba`関数に`isAllNoten`パラメータを渡す
 
 ### 関数設計
 
@@ -254,8 +245,7 @@ function calculateNextHonba(
   currentHonba: number,
   resultType: RoundResultType,
   isDealerWinner: boolean,
-  isDealerTenpai?: boolean,
-  isAllNoten?: boolean
+  isDealerTenpai?: boolean
 ): number;
 
 // 連荘を判定
@@ -272,7 +262,6 @@ function calculateNextRoundSettings(params: {
   resultType: RoundResultType;
   isDealerWinner: boolean;
   isDealerTenpai?: boolean;
-  isAllNoten?: boolean;
 }): {
   nextRiichiSticks: number;
   nextHonba: number;

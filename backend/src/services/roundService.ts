@@ -196,22 +196,6 @@ export const roundService = {
       const previousDealerScore = previousRound.scores.find((s) => s.isDealer);
       const previousIsDealerTenpai = previousDealerScore?.isTenpai === true ? true : undefined;
 
-      // 全員ノーテンを判定（流局時のみ）
-      let previousIsAllNoten: boolean | undefined = undefined;
-      if (
-        previousRound.resultType === RoundResultType.DRAW ||
-        previousRound.resultType === RoundResultType.SPECIAL_DRAW
-      ) {
-        // 全参加者がノーテン（isTenpai === false）の場合、全員ノーテン
-        const allScoresHaveTenpaiInfo = previousRound.scores.every(
-          (s) => s.isTenpai !== null
-        );
-        if (allScoresHaveTenpaiInfo) {
-          const allNoten = previousRound.scores.every((s) => s.isTenpai === false);
-          previousIsAllNoten = allNoten ? true : undefined;
-        }
-      }
-
       // 連荘を判定
       const isRenchan = isDealerRenchan(
         previousRound.resultType as RoundResultType,
@@ -230,8 +214,7 @@ export const roundService = {
         previousRound.honba,
         previousRound.resultType as RoundResultType,
         previousIsDealerWinner,
-        previousIsDealerTenpai,
-        previousIsAllNoten
+        previousIsDealerTenpai
       );
     }
 

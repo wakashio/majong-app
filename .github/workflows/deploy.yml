@@ -52,14 +52,19 @@ jobs:
           docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:${{ github.sha }}
           docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:latest
       
-      - name: Get Cloud SQL Connection Name
-        id: cloud_sql_connection
+      - name: Get Cloud SQL Connection Info
+        id: cloud_sql_info
         run: |
           CONNECTION_NAME=$(gcloud sql instances describe majong-app-db-staging \
             --project=${{ secrets.GCP_PROJECT_ID }} \
             --format='value(connectionName)')
+          PRIVATE_IP=$(gcloud sql instances describe majong-app-db-staging \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --format='value(ipAddresses[0].ipAddress)')
           echo "connection_name=$CONNECTION_NAME" >> $GITHUB_OUTPUT
+          echo "private_ip=$PRIVATE_IP" >> $GITHUB_OUTPUT
           echo "Cloud SQL Connection Name: $CONNECTION_NAME"
+          echo "Cloud SQL Private IP: $PRIVATE_IP"
       
       - name: Grant Cloud SQL Client Permission to Cloud Run Service Account
         run: |
@@ -81,8 +86,7 @@ jobs:
           gcloud run jobs deploy majong-app-migrate-staging \
             --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:${{ github.sha }} \
             --region ${{ env.GCP_REGION }} \
-            --set-cloudsql-instances ${{ steps.cloud_sql_connection.outputs.connection_name }} \
-            --set-env-vars "NODE_ENV=staging,DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@/majong_db?host=/cloudsql/${{ steps.cloud_sql_connection.outputs.connection_name }}" \
+            --set-env-vars "NODE_ENV=staging,DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@${{ steps.cloud_sql_info.outputs.private_ip }}:5432/majong_db" \
             --vpc-connector staging-connector \
             --vpc-egress all-traffic \
             --command "npx" \
@@ -98,8 +102,7 @@ jobs:
             --region ${{ env.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --set-cloudsql-instances ${{ steps.cloud_sql_connection.outputs.connection_name }} \
-            --set-env-vars "NODE_ENV=staging,DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@/majong_db?host=/cloudsql/${{ steps.cloud_sql_connection.outputs.connection_name }}" \
+            --set-env-vars "NODE_ENV=staging,DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@${{ steps.cloud_sql_info.outputs.private_ip }}:5432/majong_db" \
             --vpc-connector staging-connector \
             --vpc-egress all-traffic \
             --cpu 1 \

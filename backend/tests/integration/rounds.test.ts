@@ -669,13 +669,13 @@ describe("Rounds API", () => {
       await prisma.round.delete({ where: { id: firstRound.id } });
     });
 
-    it("前局で流局時に全員ノーテンの場合、連荘でなく本場+1で局を作成できる", async () => {
+    it("前局で流局時に親がノーテンの場合、連荘でなく本場+1で局を作成できる", async () => {
       if (shouldSkipTests || !prisma || !testPlayerIds || testPlayerIds.length !== 4) {
         console.log("テストをスキップ: データベース接続が必要");
         return;
       }
 
-      // 1局目を作成して流局（全員ノーテン、本場1）
+      // 1局目を作成して流局（親がノーテン、本場1）
       const firstRound = await prisma.round.create({
         data: {
           hanchanId: testHanchanId,
@@ -742,19 +742,19 @@ describe("Rounds API", () => {
 
       expect(response.body).toHaveProperty("data");
       expect(response.body.data).toHaveProperty("roundNumber", 2); // 連荘でないので局番号+1
-      expect(response.body.data.honba).toBe(2); // 全員ノーテンなので本場+1
+      expect(response.body.data.honba).toBe(2); // 親がノーテンなので本場+1
 
       await prisma.round.delete({ where: { id: response.body.data.id } });
       await prisma.round.delete({ where: { id: firstRound.id } });
     });
 
-    it("前局で特殊流局時に全員ノーテンの場合、連荘でなく本場+1で局を作成できる", async () => {
+    it("前局で特殊流局時に親がノーテンの場合、連荘でなく本場+1で局を作成できる", async () => {
       if (shouldSkipTests || !prisma || !testPlayerIds || testPlayerIds.length !== 4) {
         console.log("テストをスキップ: データベース接続が必要");
         return;
       }
 
-      // 1局目を作成して特殊流局（全員ノーテン、本場1）
+      // 1局目を作成して特殊流局（親がノーテン、本場1）
       const firstRound = await prisma.round.create({
         data: {
           hanchanId: testHanchanId,

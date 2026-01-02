@@ -73,14 +73,14 @@ describe("riichiHonbaCalculationService", () => {
       expect(result).toBe(2);
     });
 
-    it("通常の流局で親がノーテンの場合、本場を維持", () => {
+    it("通常の流局で親がノーテンの場合、本場を+1", () => {
       const result = calculateNextHonba(1, RoundResultType.DRAW, false, false);
-      expect(result).toBe(1);
+      expect(result).toBe(2);
     });
 
-    it("通常の流局で親がノーテンの場合（isDealerTenpai未指定）、本場を維持", () => {
+    it("通常の流局で親がノーテンの場合（isDealerTenpai未指定）、本場を+1", () => {
       const result = calculateNextHonba(1, RoundResultType.DRAW, false);
-      expect(result).toBe(1);
+      expect(result).toBe(2);
     });
 
     it("特殊流局で親がテンパイしている場合、本場を+1", () => {
@@ -88,14 +88,14 @@ describe("riichiHonbaCalculationService", () => {
       expect(result).toBe(2);
     });
 
-    it("特殊流局で親がノーテンの場合、本場を維持", () => {
+    it("特殊流局で親がノーテンの場合、本場を+1", () => {
       const result = calculateNextHonba(1, RoundResultType.SPECIAL_DRAW, false, false);
-      expect(result).toBe(1);
+      expect(result).toBe(2);
     });
 
-    it("特殊流局で親がノーテンの場合（isDealerTenpai未指定）、本場を維持", () => {
+    it("特殊流局で親がノーテンの場合（isDealerTenpai未指定）、本場を+1", () => {
       const result = calculateNextHonba(1, RoundResultType.SPECIAL_DRAW, false);
-      expect(result).toBe(1);
+      expect(result).toBe(2);
     });
 
     it("本場が0の場合、親が上がっても1になる", () => {
@@ -103,30 +103,6 @@ describe("riichiHonbaCalculationService", () => {
       expect(result).toBe(1);
     });
 
-    it("通常の流局で全員ノーテンの場合、本場を+1（連荘ではない）", () => {
-      const result = calculateNextHonba(1, RoundResultType.DRAW, false, false, true);
-      expect(result).toBe(2);
-    });
-
-    it("通常の流局で全員ノーテンの場合（本場0から1へ）", () => {
-      const result = calculateNextHonba(0, RoundResultType.DRAW, false, false, true);
-      expect(result).toBe(1);
-    });
-
-    it("特殊流局で全員ノーテンの場合、本場を+1（連荘ではない）", () => {
-      const result = calculateNextHonba(1, RoundResultType.SPECIAL_DRAW, false, false, true);
-      expect(result).toBe(2);
-    });
-
-    it("通常の流局で親がノーテンで全員ノーテンでない場合、本場を維持", () => {
-      const result = calculateNextHonba(1, RoundResultType.DRAW, false, false, false);
-      expect(result).toBe(1);
-    });
-
-    it("特殊流局で親がノーテンで全員ノーテンでない場合、本場を維持", () => {
-      const result = calculateNextHonba(1, RoundResultType.SPECIAL_DRAW, false, false, false);
-      expect(result).toBe(1);
-    });
   });
 
   describe("calculateIsRenchan", () => {
@@ -316,7 +292,7 @@ describe("riichiHonbaCalculationService", () => {
       });
 
       expect(result.nextRiichiSticks).toBe(1);
-      expect(result.nextHonba).toBe(1);
+      expect(result.nextHonba).toBe(2);
       expect(result.isRenchan).toBe(false);
     });
 
@@ -341,36 +317,6 @@ describe("riichiHonbaCalculationService", () => {
         resultType: RoundResultType.SPECIAL_DRAW,
         isDealerWinner: false,
         isDealerTenpai: false,
-      });
-
-      expect(result.nextRiichiSticks).toBe(1);
-      expect(result.nextHonba).toBe(1);
-      expect(result.isRenchan).toBe(false);
-    });
-
-    it("通常の流局で全員ノーテンの場合の次局設定を正しく計算する", () => {
-      const result = calculateNextRoundSettings({
-        currentRiichiSticks: 2,
-        currentHonba: 1,
-        resultType: RoundResultType.DRAW,
-        isDealerWinner: false,
-        isDealerTenpai: false,
-        isAllNoten: true,
-      });
-
-      expect(result.nextRiichiSticks).toBe(2);
-      expect(result.nextHonba).toBe(2);
-      expect(result.isRenchan).toBe(false);
-    });
-
-    it("特殊流局で全員ノーテンの場合の次局設定を正しく計算する", () => {
-      const result = calculateNextRoundSettings({
-        currentRiichiSticks: 1,
-        currentHonba: 1,
-        resultType: RoundResultType.SPECIAL_DRAW,
-        isDealerWinner: false,
-        isDealerTenpai: false,
-        isAllNoten: true,
       });
 
       expect(result.nextRiichiSticks).toBe(1);
