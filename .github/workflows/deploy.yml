@@ -37,6 +37,32 @@ jobs:
           gcloud services enable run.googleapis.com --project=${{ secrets.GCP_PROJECT_ID }} || true
           gcloud services enable sqladmin.googleapis.com --project=${{ secrets.GCP_PROJECT_ID }} || true
       
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.0"
+      
+      - name: Terraform Init
+        working-directory: infrastructure/terraform/environments/staging
+        run: terraform init
+      
+      - name: Import existing VPC network (if exists)
+        working-directory: infrastructure/terraform/environments/staging
+        run: |
+          terraform import module.vpc.google_compute_network.vpc projects/${{ secrets.GCP_PROJECT_ID }}/global/networks/majong-app-vpc-staging || echo "VPC network already imported or does not exist"
+        continue-on-error: true
+      
+      - name: Terraform Apply
+        working-directory: infrastructure/terraform/environments/staging
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_region: ${{ env.GCP_REGION }}
+          TF_VAR_db_user: ${{ secrets.DB_USER }}
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_frontend_image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-frontend:${{ github.sha }}
+          TF_VAR_backend_image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/majong-app-backend:${{ github.sha }}
+        run: terraform apply -auto-approve
+      
       - name: Build and push Frontend
         run: |
           cd frontend
