@@ -821,13 +821,14 @@ export const roundService = {
       // フロントエンドから送信された点数を処理
       if (data.scores && data.scores.length > 0) {
         if (data.resultType === RoundResultType.RON) {
-          // ロン時: 和了者の点数（本場・積み棒除く）から、本場・積み棒を含めた最終点数を計算
+          // ロン時: 和了者の点数（本場・積み棒除く）から、本場を含めた最終点数を計算
+          // 積み棒は後で統合処理で加算するため、ここでは加算しない
           const winnerScore = data.scores.find((s) => s.isWinner)?.scoreChange ?? 0;
           const honba = roundForCalculation?.honba ?? round.honba ?? 0;
-          const riichiSticks = roundForCalculation?.riichiSticks ?? round.riichiSticks ?? 0;
           
-          // 和了者の最終獲得点数 = 和了点（本場・積み棒除く） + (本場 × 300) + (積み棒 × 1000)
-          const finalWinnerScore = winnerScore + (honba * 300) + (riichiSticks * 1000);
+          // 和了者の最終獲得点数 = 和了点（本場・積み棒除く） + (本場 × 300)
+          // 積み棒は後で統合処理で加算する
+          const finalWinnerScore = winnerScore + (honba * 300);
           
           // 放銃者の最終支払い点数 = -(和了点（本場・積み棒除く） + (本場 × 300))
           // 積み棒は和了者が獲得するだけで、放銃者からは引かない
@@ -877,7 +878,7 @@ export const roundService = {
           });
         } else if (data.resultType === RoundResultType.TSUMO) {
           // ツモ時: フロントエンドから送信された点数をそのまま使用
-          // フロントエンドで既に本場・積み棒を含めた最終点数が計算されている
+          // フロントエンドから送信される点数には積み棒が含まれていないため、バックエンドで積み棒を加算する
           scoresToCreate = data.scores.map((score) => {
             return {
               roundId,
@@ -976,9 +977,9 @@ export const roundService = {
 
       // 積み棒による点数変動を計算
       const riichiSticksScoreChanges: Map<string, number> = new Map();
+      const riichiSticks = roundForCalculation?.riichiSticks ?? round.riichiSticks ?? 0;
       if (data.resultType === RoundResultType.NAGASHI_MANGAN) {
         // 積み棒が存在する場合のみ加算（0の場合は加算しない）
-        const riichiSticks = roundForCalculation?.riichiSticks ?? round.riichiSticks ?? 0;
         if (riichiSticks > 0) {
           const riichiSticksPoints = riichiSticks * 1000;
           // 流し満貫時: 流し満貫を達成した参加者が`round.riichiSticks × 1000`点を獲得
@@ -987,8 +988,76 @@ export const roundService = {
             riichiSticksScoreChanges.set(nagashiManganPlayer.playerId, riichiSticksPoints);
           }
         }
+      } else if (
+        data.resultType === RoundResultType.TSUMO ||
+        data.resultType === RoundResultType.RON
+      ) {
+        // ツモ時・ロン時: フロントエンドから送信される点数には積み棒が含まれていないため、バックエンドで積み棒を加算する
+        // 積み棒が存在する場合のみ加算（0の場合は加算しない）
+        if (riichiSticks > 0) {
+          const riichiSticksPoints = riichiSticks * 1000;
+          if (data.resultType === RoundResultType.RON) {
+            // ロンの場合、ダブロン判定
+            const winners = scoresToCreate.filter((s) => s.isWinner);
+            const winnerCount = winners.length;
+            const isDoubleRonResult = winnerCount > 1;
+
+            if (isDoubleRonResult) {
+              // ダブロン・トリロン: 放銃者から見て最も近い上家のみが積み棒を獲得
+              const ronTarget = scoresToCreate.find((s) => s.isRonTarget === true);
+              if (ronTarget) {
+                // 放銃者から見て最も近い上家を特定
+                const ronTargetPlayer = await prisma.player.findUnique({
+                  where: { id: ronTarget.playerId },
+                });
+                if (ronTargetPlayer) {
+                  const hanchanPlayer = await prisma.hanchanPlayer.findFirst({
+                    where: {
+                      hanchanId: round.hanchanId,
+                      playerId: ronTargetPlayer.id,
+                    },
+                  });
+                  if (hanchanPlayer) {
+                    const ronTargetSeatPosition = hanchanPlayer.seatPosition;
+                    // 上家のseatPosition = (放銃者のseatPosition + 3) % 4
+                    const upperSeatPosition = (ronTargetSeatPosition + 3) % 4;
+                    // 和了者の中で最も近い上家を特定
+                    for (const winner of winners) {
+                      const winnerPlayer = await prisma.player.findUnique({
+                        where: { id: winner.playerId },
+                      });
+                      if (winnerPlayer) {
+                        const winnerHanchanPlayer = await prisma.hanchanPlayer.findFirst({
+                          where: {
+                            hanchanId: round.hanchanId,
+                            playerId: winnerPlayer.id,
+                          },
+                        });
+                        if (winnerHanchanPlayer?.seatPosition === upperSeatPosition) {
+                          riichiSticksScoreChanges.set(winner.playerId, riichiSticksPoints);
+                          break; // 最初に見つかった上家のみが積み棒を獲得
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            } else {
+              // 通常のロン: 和了者が積み棒を獲得
+              const winner = scoresToCreate.find((s) => s.isWinner);
+              if (winner) {
+                riichiSticksScoreChanges.set(winner.playerId, riichiSticksPoints);
+              }
+            }
+          } else {
+            // ツモ: 和了者が積み棒を獲得
+            const winner = scoresToCreate.find((s) => s.isWinner);
+            if (winner) {
+              riichiSticksScoreChanges.set(winner.playerId, riichiSticksPoints);
+            }
+          }
+        }
       }
-      // ツモ時・ロン時: 積み棒の点数は既にscoresToCreateに含まれているため、追加計算しない
       // 流局時: 積み棒による点数変動は0（次局に持ち越される）
 
       // リーチ記録、本場、積み棒の点数変動を統合
@@ -1043,6 +1112,39 @@ export const roundService = {
           },
         },
       },
+    }).catch(async (error) => {
+      // エラーが発生した場合、dealerPlayerを含めずに再試行
+      console.error("Error fetching round with dealerPlayer:", error);
+      const roundWithoutDealer = await prisma.round.findUnique({
+        where: { id: roundId },
+        include: {
+          scores: {
+            include: {
+              player: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      });
+      if (!roundWithoutDealer) {
+        throw new Error("Round not found");
+      }
+      // dealerPlayerを別途取得
+      const dealerPlayer = await prisma.player.findUnique({
+        where: { id: roundWithoutDealer.dealerPlayerId },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+      return {
+        ...roundWithoutDealer,
+        dealerPlayer: dealerPlayer || { id: roundWithoutDealer.dealerPlayerId, name: "Unknown" },
+      };
     });
 
     if (!roundWithScores) {

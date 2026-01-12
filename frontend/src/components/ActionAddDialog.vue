@@ -42,6 +42,13 @@ const dialogValue = computed({
   set: (value) => emit("update:modelValue", value),
 });
 
+const targetPlayerOptions = computed(() => {
+  if (!props.playerId) {
+    return props.playerOptions;
+  }
+  return props.playerOptions.filter((option) => option.value !== props.playerId);
+});
+
 const handleActionTypeChange = (value: string | string[]): void => {
   const val = Array.isArray(value) ? value[0] : value;
   if (typeof val === "string") {
@@ -115,7 +122,7 @@ const handleCancel = (): void => {
           <PlayerSelectButton
             v-if="props.nakiType !== NakiType.ANKAN"
             :model-value="props.targetPlayerId ?? undefined"
-            :items="props.playerOptions"
+            :items="targetPlayerOptions"
             label="対象参加者"
             :disabled="props.playerOptions.length === 0 || props.isLoading"
             :required="true"

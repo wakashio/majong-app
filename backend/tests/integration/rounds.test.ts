@@ -2883,6 +2883,338 @@ describe("Rounds API", () => {
       await prisma.round.delete({ where: { id: round.id } });
     });
 
+    it("親がリーチを宣言してツモで上がった場合（リーチ棒と積み棒が正しく計算される）", async () => {
+      if (!prisma || !testPlayerIds || testPlayerIds.length !== 4) {
+        console.log("テストをスキップ: データベース接続が必要");
+        return;
+      }
+
+      const round = await prisma.round.create({
+        data: {
+          hanchanId: testHanchanId,
+          roundNumber: 1,
+          wind: "EAST",
+          dealerPlayerId: testPlayerIds[0],
+          honba: 0,
+          riichiSticks: 0,
+          startedAt: new Date(),
+        },
+      });
+
+      // 親がリーチを宣言 → 積み棒+1（1本になる）
+      await prisma.roundAction.create({
+        data: {
+          roundId: round.id,
+          playerId: testPlayerIds[0],
+          type: "RIICHI",
+          declaredAt: new Date(),
+        },
+      });
+
+      // リーチ記録追加時にriichiSticksが更新されることを確認
+      const roundAfterRiichi = await prisma.round.findUnique({
+        where: { id: round.id },
+      });
+      expect(roundAfterRiichi?.riichiSticks).toBe(1);
+
+      // 局終了（親がツモ、基本点2000点 = 子1人あたり2000点）
+      // フロントエンドから送信される点数には積み棒が含まれていない（2000×3 = 6000）
+      const endData = {
+        resultType: "TSUMO",
+        scores: [
+          {
+            playerId: testPlayerIds[0],
+            scoreChange: 6000, // 基本点2000×3（積み棒は含まれていない）
+            isDealer: true,
+            isWinner: true,
+            han: 1,
+            fu: 30,
+            yaku: ["リーチ", "ツモ"],
+          },
+          {
+            playerId: testPlayerIds[1],
+            scoreChange: -2000, // 子1人あたり2000点
+            isDealer: false,
+            isWinner: false,
+          },
+          {
+            playerId: testPlayerIds[2],
+            scoreChange: -2000, // 子1人あたり2000点
+            isDealer: false,
+            isWinner: false,
+          },
+          {
+            playerId: testPlayerIds[3],
+            scoreChange: -2000, // 子1人あたり2000点
+            isDealer: false,
+            isWinner: false,
+          },
+        ],
+      };
+
+      const response = await request(app)
+        .put(`/api/rounds/${round.id}/end`)
+        .send(endData)
+        .expect(200);
+
+      expect(response.body).toHaveProperty("data");
+      expect(response.body.data).toHaveProperty("scores");
+      expect(response.body.data.scores).toHaveLength(4);
+
+      // 点数変動を確認
+      // 親（和了者）: 基本点2000×3 + 積み棒1000 - リーチ棒1000 = 6000点
+      // 純粋に積み棒が増えて、リーチの支払い分のマイナスを行うという処理フロー
+      const winnerScore = response.body.data.scores.find(
+        (s: { isWinner: boolean }) => s.isWinner
+      );
+      expect(winnerScore.scoreChange).toBe(6000); // 6000（基本点2000×3）+ 1000（積み棒）- 1000（リーチ棒）= 6000
+
+      // 子1: -2000点（基本点のみ、本場なし）
+      const player1Score = response.body.data.scores.find(
+        (s: { playerId: string }) => s.playerId === testPlayerIds[1]
+      );
+      expect(player1Score.scoreChange).toBe(-2000);
+
+      // 子2: -2000点（基本点のみ、本場なし）
+      const player2Score = response.body.data.scores.find(
+        (s: { playerId: string }) => s.playerId === testPlayerIds[2]
+      );
+      expect(player2Score.scoreChange).toBe(-2000);
+
+      // 子3: -2000点（基本点のみ、本場なし）
+      const player3Score = response.body.data.scores.find(
+        (s: { playerId: string }) => s.playerId === testPlayerIds[3]
+      );
+      expect(player3Score.scoreChange).toBe(-2000);
+
+      await prisma.round.delete({ where: { id: round.id } });
+    });
+
+    it("子がリーチを宣言してツモで上がった場合（2000/4000、リーチ棒と積み棒が正しく計算される）", async () => {
+      if (!prisma || !testPlayerIds || testPlayerIds.length !== 4) {
+        console.log("テストをスキップ: データベース接続が必要");
+        return;
+      }
+
+      const round = await prisma.round.create({
+        data: {
+          hanchanId: testHanchanId,
+          roundNumber: 1,
+          wind: "EAST",
+          dealerPlayerId: testPlayerIds[0],
+          honba: 0,
+          riichiSticks: 0,
+          startedAt: new Date(),
+        },
+      });
+
+      // 子1がリーチを宣言 → 積み棒+1（1本になる）
+      await prisma.roundAction.create({
+        data: {
+          roundId: round.id,
+          playerId: testPlayerIds[1],
+          type: "RIICHI",
+          declaredAt: new Date(),
+        },
+      });
+
+      // リーチ記録追加時にriichiSticksが更新されることを確認
+      const roundAfterRiichi = await prisma.round.findUnique({
+        where: { id: round.id },
+      });
+      expect(roundAfterRiichi?.riichiSticks).toBe(1);
+
+      // 局終了（子1がツモ、2000/4000 = 親から4000、子から2000×2 = 基本点8000点）
+      // フロントエンドから送信される点数には積み棒が含まれていない（8000）
+      const endData = {
+        resultType: "TSUMO",
+        scores: [
+          {
+            playerId: testPlayerIds[1],
+            scoreChange: 8000, // 基本点8000（親から4000 + 子から2000×2、積み棒は含まれていない）
+            isDealer: false,
+            isWinner: true,
+            han: 1,
+            fu: 30,
+            yaku: ["リーチ", "ツモ"],
+          },
+          {
+            playerId: testPlayerIds[0],
+            scoreChange: -4000, // 親から4000点
+            isDealer: true,
+            isWinner: false,
+          },
+          {
+            playerId: testPlayerIds[2],
+            scoreChange: -2000, // 子から2000点
+            isDealer: false,
+            isWinner: false,
+          },
+          {
+            playerId: testPlayerIds[3],
+            scoreChange: -2000, // 子から2000点
+            isDealer: false,
+            isWinner: false,
+          },
+        ],
+      };
+
+      const response = await request(app)
+        .put(`/api/rounds/${round.id}/end`)
+        .send(endData)
+        .expect(200);
+
+      expect(response.body).toHaveProperty("data");
+      expect(response.body.data).toHaveProperty("scores");
+      expect(response.body.data.scores).toHaveLength(4);
+
+      // 点数変動を確認
+      // 子1（和了者）: 基本点8000 + 積み棒1000 - リーチ棒1000 = 8000点
+      // 純粋に積み棒が増えて、リーチの支払い分のマイナスを行うという処理フロー
+      const winnerScore = response.body.data.scores.find(
+        (s: { isWinner: boolean }) => s.isWinner
+      );
+      expect(winnerScore.scoreChange).toBe(8000); // 8000（基本点）+ 1000（積み棒）- 1000（リーチ棒）= 8000
+
+      // 親: -4000点（基本点のみ、本場なし）
+      const dealerScore = response.body.data.scores.find(
+        (s: { playerId: string }) => s.playerId === testPlayerIds[0]
+      );
+      expect(dealerScore.scoreChange).toBe(-4000);
+
+      // 子2: -2000点（基本点のみ、本場なし）
+      const player2Score = response.body.data.scores.find(
+        (s: { playerId: string }) => s.playerId === testPlayerIds[2]
+      );
+      expect(player2Score.scoreChange).toBe(-2000);
+
+      // 子3: -2000点（基本点のみ、本場なし）
+      const player3Score = response.body.data.scores.find(
+        (s: { playerId: string }) => s.playerId === testPlayerIds[3]
+      );
+      expect(player3Score.scoreChange).toBe(-2000);
+
+      await prisma.round.delete({ where: { id: round.id } });
+    });
+
+    it("複数のリーチ者がいる場合（親がリーチを宣言、子1がリーチを宣言、親がツモで上がる）", async () => {
+      if (!prisma || !testPlayerIds || testPlayerIds.length !== 4) {
+        console.log("テストをスキップ: データベース接続が必要");
+        return;
+      }
+
+      const round = await prisma.round.create({
+        data: {
+          hanchanId: testHanchanId,
+          roundNumber: 1,
+          wind: "EAST",
+          dealerPlayerId: testPlayerIds[0],
+          honba: 0,
+          riichiSticks: 0,
+          startedAt: new Date(),
+        },
+      });
+
+      // 親がリーチを宣言 → 積み棒+1（1本になる）
+      await prisma.roundAction.create({
+        data: {
+          roundId: round.id,
+          playerId: testPlayerIds[0],
+          type: "RIICHI",
+          declaredAt: new Date(),
+        },
+      });
+
+      // 子1がリーチを宣言 → 積み棒+1（2本になる）
+      await prisma.roundAction.create({
+        data: {
+          roundId: round.id,
+          playerId: testPlayerIds[1],
+          type: "RIICHI",
+          declaredAt: new Date(),
+        },
+      });
+
+      // リーチ記録追加時にriichiSticksが更新されることを確認
+      const roundAfterRiichi = await prisma.round.findUnique({
+        where: { id: round.id },
+      });
+      expect(roundAfterRiichi?.riichiSticks).toBe(2);
+
+      // 局終了（親がツモ、基本点2000点 = 子1人あたり2000点）
+      // フロントエンドから送信される点数には積み棒が含まれている（2000×3 + 2000 = 8000）
+      const endData = {
+        resultType: "TSUMO",
+        scores: [
+          {
+            playerId: testPlayerIds[0],
+            scoreChange: 8000, // 基本点2000×3 + 積み棒2000
+            isDealer: true,
+            isWinner: true,
+            han: 1,
+            fu: 30,
+            yaku: ["リーチ", "ツモ"],
+          },
+          {
+            playerId: testPlayerIds[1],
+            scoreChange: -2000, // 子1人あたり2000点
+            isDealer: false,
+            isWinner: false,
+          },
+          {
+            playerId: testPlayerIds[2],
+            scoreChange: -2000, // 子1人あたり2000点
+            isDealer: false,
+            isWinner: false,
+          },
+          {
+            playerId: testPlayerIds[3],
+            scoreChange: -2000, // 子1人あたり2000点
+            isDealer: false,
+            isWinner: false,
+          },
+        ],
+      };
+
+      const response = await request(app)
+        .put(`/api/rounds/${round.id}/end`)
+        .send(endData)
+        .expect(200);
+
+      expect(response.body).toHaveProperty("data");
+      expect(response.body.data).toHaveProperty("scores");
+      expect(response.body.data.scores).toHaveLength(4);
+
+      // 点数変動を確認
+      // 親（和了者）: 基本点2000×3 + 積み棒2000 - リーチ棒1000 = 7000点
+      // 純粋に積み棒が増えて、リーチの支払い分のマイナスを行うという処理フロー
+      // 自分がリーチを宣言した分のリーチ棒は相殺されるが、他の人がリーチを宣言した分の積み棒は獲得できる
+      const winnerScore = response.body.data.scores.find(
+        (s: { isWinner: boolean }) => s.isWinner
+      );
+      expect(winnerScore.scoreChange).toBe(7000); // 6000（基本点2000×3）+ 2000（積み棒）- 1000（リーチ棒）= 7000
+
+      // 子1（リーチ者）: -2000点 - リーチ棒1000 = -3000点（基本点 + リーチ棒）
+      const riichiPlayerScore = response.body.data.scores.find(
+        (s: { playerId: string }) => s.playerId === testPlayerIds[1]
+      );
+      expect(riichiPlayerScore.scoreChange).toBe(-3000); // -2000 - 1000（リーチ棒）
+
+      // 子2: -2000点（基本点のみ、本場なし）
+      const player2Score = response.body.data.scores.find(
+        (s: { playerId: string }) => s.playerId === testPlayerIds[2]
+      );
+      expect(player2Score.scoreChange).toBe(-2000);
+
+      // 子3: -2000点（基本点のみ、本場なし）
+      const player3Score = response.body.data.scores.find(
+        (s: { playerId: string }) => s.playerId === testPlayerIds[3]
+      );
+      expect(player3Score.scoreChange).toBe(-2000);
+
+      await prisma.round.delete({ where: { id: round.id } });
+    });
+
     it("ダブロン時の積み棒分配（最も近い上家のみが積み棒を獲得）", async () => {
       if (!prisma || !testPlayerIds || testPlayerIds.length !== 4) {
         console.log("テストをスキップ: データベース接続が必要");

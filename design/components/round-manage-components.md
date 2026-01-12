@@ -393,6 +393,10 @@
 - `PlayerSelectButton`を使用して各選択項目を表示
 - アクションタイプに応じて表示項目を切り替え（鳴きの場合は鳴きタイプ・対象参加者を表示）
 - 参加者情報が読み込まれていない場合は警告メッセージを表示
+- **対象参加者の選択肢**: 鳴きタイプが暗槓以外の場合、対象参加者の選択肢は`playerOptions`から`playerId`（鳴いた参加者）を除外した配列を使用する
+  - `targetPlayerOptions`というcomputedプロパティを定義し、`playerOptions.filter(option => option.value !== playerId)`を返す
+  - 対象参加者の`PlayerSelectButton`の`:items`に`targetPlayerOptions`を指定する
+  - これにより、自分自身を対象に鳴くことを防ぐ
 
 ### 使用例
 
