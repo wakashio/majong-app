@@ -877,13 +877,27 @@ export const roundService = {
             }
           });
         } else if (data.resultType === RoundResultType.TSUMO) {
-          // ツモ時: フロントエンドから送信された点数をそのまま使用
-          // フロントエンドから送信される点数には積み棒が含まれていないため、バックエンドで積み棒を加算する
+          // ツモ時: フロントエンドから送信された点数（基本点のみ、本場・積み棒除く）に本場を加算
+          // 積み棒は後で統合処理で加算するため、ここでは加算しない
+          const honba = roundForCalculation?.honba ?? round.honba ?? 0;
+          
           scoresToCreate = data.scores.map((score) => {
+            let scoreChange = score.scoreChange;
+            
+            // 本場を加算
+            if (score.isWinner) {
+              // 和了者: 本場 × 100 × 3（親がツモの場合）または 本場 × 100 × 3（子がツモの場合）
+              // ツモ時は常に本場 × 100 × 3を加算（親から1人、子から2人分）
+              scoreChange += honba * 100 * 3;
+            } else {
+              // 非和了者: 本場 × 100を減算
+              scoreChange -= honba * 100;
+            }
+            
             return {
               roundId,
               playerId: score.playerId,
-              scoreChange: score.scoreChange,
+              scoreChange,
               isDealer: score.isDealer,
               isWinner: score.isWinner ?? false,
               isRonTarget: score.isRonTarget ?? null,
@@ -974,6 +988,7 @@ export const roundService = {
       // 本場による点数変動を計算
       const honbaScoreChanges: Map<string, number> = new Map();
       // ツモ時・ロン時: 本場の点数は既にscoresToCreateに含まれているため、追加計算しない
+      // （ツモ時は879-920行目で、ロン時は829行目で本場を加算済み）
 
       // 積み棒による点数変動を計算
       const riichiSticksScoreChanges: Map<string, number> = new Map();

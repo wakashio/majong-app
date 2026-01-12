@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { RoundResultType, SpecialDrawType } from "../types/round";
 import type { ScoreInput, RoundEditErrors, Round } from "../types/round";
 import type { HanchanPlayer } from "../types/hanchan";
+import { calculateScoresFromBaseScore } from "../utils/roundApi";
 
 // 点数表のデータ（バックエンドと同じ）
 interface TsumoScoreTable {
@@ -293,107 +294,41 @@ const getScoreFromLabel = (label: string): number | null => {
   return found ? found.score : null;
 };
 
-// 点数からラベルを取得（本場・積み棒を除いた点数から）
+// 点数からラベルを取得（基本点から直接取得）
 const getLabelFromScore = (score: number | null): string | null => {
   if (score === null) return null;
   const winner = props.scoreInputs.find((si) => si.isWinner);
   if (!winner) return null;
   const isDealer = winner.isDealer;
 
-  // 本場・積み棒を除いた点数を逆算
-  const honba = props.round?.honba ?? 0;
-  const riichiSticks = props.round?.riichiSticks ?? 0;
-  const baseScore = reverseCalculateBaseScore(score, honba, riichiSticks, isDealer, props.scoreInputs);
+  // 現在、scoreは基本点のみ（本場・積み棒を含まない）なので、直接点数表からラベルを取得
+  // ただし、scoreは和了者の基本点の合計（親がツモ: fromNonDealer * 3、子がツモ: fromDealer + fromNonDealer * 2）
+  // なので、これを基本点（点数表のキー）に変換する必要がある
 
-  if (baseScore === null) return null;
   const labels = isDealer ? getDealerScoreLabels() : getNonDealerScoreLabels();
-  const found = labels.find((l) => l.score === baseScore);
-  return found ? found.label : null;
-};
-
-// 点数表の基本点数から本場・積み棒を含めた最終点数を計算
-const calculateTsumoScoresFromBaseScore = (
-  baseScore: number,
-  honba: number,
-  riichiSticks: number,
-  isDealer: boolean,
-  scoreInputs: ScoreInput[]
-): Array<{ playerId: string; scoreChange: number }> => {
-  if (isDealer) {
-    // 親がツモ
-    const scoreEntry = tsumoScoreTable.dealer[baseScore];
-    if (!scoreEntry) {
-      return [];
-    }
-    const fromNonDealer = scoreEntry.fromNonDealer + honba * 100;
-    const winnerScore = fromNonDealer * 3 + riichiSticks * 1000;
-
-    return scoreInputs.map((si) => {
-      if (si.isWinner) {
-        return { playerId: si.playerId, scoreChange: winnerScore };
-      } else {
-        return { playerId: si.playerId, scoreChange: -fromNonDealer };
-      }
-    });
-  } else {
-    // 子がツモ
-    const scoreEntry = tsumoScoreTable.nonDealer[baseScore];
-    if (!scoreEntry) {
-      return [];
-    }
-    const fromDealer = scoreEntry.fromDealer + honba * 100;
-    const fromNonDealer = scoreEntry.fromNonDealer + honba * 100;
-    const winnerScore = fromDealer + fromNonDealer * 2 + riichiSticks * 1000;
-
-    return scoreInputs.map((si) => {
-      if (si.isWinner) {
-        return { playerId: si.playerId, scoreChange: winnerScore };
-      } else if (si.isDealer) {
-        return { playerId: si.playerId, scoreChange: -fromDealer };
-      } else {
-        return { playerId: si.playerId, scoreChange: -fromNonDealer };
-      }
-    });
-  }
-};
-
-// 最終点数から本場・積み棒を除いた基本点数を逆算
-const reverseCalculateBaseScore = (
-  finalScore: number,
-  honba: number,
-  riichiSticks: number,
-  isDealer: boolean,
-  scoreInputs: ScoreInput[]
-): number | null => {
-  const winner = scoreInputs.find((si) => si.isWinner);
-  if (!winner) return null;
 
   if (isDealer) {
-    // 親がツモ: 和了者の点数から基本点数を逆算
-    // winnerScore = fromNonDealer * 3 + riichiSticks * 1000
-    // fromNonDealer = (winnerScore - riichiSticks * 1000) / 3
-    const fromNonDealer = (finalScore - riichiSticks * 1000) / 3;
-    const baseFromNonDealer = fromNonDealer - honba * 100;
-
+    // 親がツモ: score = fromNonDealer * 3
+    // baseScoreを探すために、fromNonDealerを計算
+    const fromNonDealer = score / 3;
     // 点数表から該当する基本点数を探す
-    for (const [score, entry] of Object.entries(tsumoScoreTable.dealer)) {
-      if (entry.fromNonDealer === baseFromNonDealer) {
-        return Number(score);
+    for (const label of labels) {
+      const entry = tsumoScoreTable.dealer[label.score];
+      if (entry && entry.fromNonDealer === fromNonDealer) {
+        return label.label;
       }
     }
   } else {
-    // 子がツモ: 和了者の点数から基本点数を逆算
-    // winnerScore = fromDealer + fromNonDealer * 2 + riichiSticks * 1000
+    // 子がツモ: score = fromDealer + fromNonDealer * 2
     // 非和了者の点数から逆算
-    const nonWinner = scoreInputs.find((si) => !si.isWinner && !si.isDealer);
+    const nonWinner = props.scoreInputs.find((si) => !si.isWinner && !si.isDealer);
     if (nonWinner && nonWinner.scoreChange !== null && nonWinner.scoreChange !== undefined) {
       const fromNonDealer = -nonWinner.scoreChange;
-      const baseFromNonDealer = fromNonDealer - honba * 100;
-
       // 点数表から該当する基本点数を探す
-      for (const [score, entry] of Object.entries(tsumoScoreTable.nonDealer)) {
-        if (entry.fromNonDealer === baseFromNonDealer) {
-          return Number(score);
+      for (const label of labels) {
+        const entry = tsumoScoreTable.nonDealer[label.score];
+        if (entry && entry.fromNonDealer === fromNonDealer) {
+          return label.label;
         }
       }
     }
@@ -401,6 +336,7 @@ const reverseCalculateBaseScore = (
 
   return null;
 };
+
 
 </script>
 
@@ -557,24 +493,24 @@ const reverseCalculateBaseScore = (
                     ? ['点数は必須です']
                     : []
                 "
-                @update:model-value="(v) => {
+                @update:model-value="async (v) => {
                   const label = typeof v === 'string' ? v : '';
                   const baseScore = getScoreFromLabel(label);
-                  if (baseScore === null) return;
+                  if (baseScore === null || !props.round?.id) return;
 
-                  // 本場・積み棒を含めた最終点数を計算
-                  const honba = props.round?.honba ?? 0;
-                  const riichiSticks = props.round?.riichiSticks ?? 0;
-                  const calculatedScores = calculateTsumoScoresFromBaseScore(
+                  // バックエンドで基本点から点数を計算（本場・積み棒を含めない）
+                  const result = await calculateScoresFromBaseScore(props.round.id, {
                     baseScore,
-                    honba,
-                    riichiSticks,
-                    winner.isDealer,
-                    props.scoreInputs
-                  );
+                    winnerPlayerId: winner.playerId,
+                  });
+
+                  if ('error' in result) {
+                    console.error('Error calculating scores:', result.error);
+                    return;
+                  }
 
                   // 各プレイヤーのscoreChangeを更新
-                  calculatedScores.forEach((calculated) => {
+                  result.data.scores.forEach((calculated) => {
                     const scoreInput = props.scoreInputs.find((si) => si.playerId === calculated.playerId);
                     if (scoreInput) {
                       const updated = { ...scoreInput, scoreChange: calculated.scoreChange };

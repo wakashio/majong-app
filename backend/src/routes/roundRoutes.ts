@@ -13,6 +13,7 @@ router.post("/rounds/:id/riichis", roundController.createRiichi);
 router.post("/rounds/:id/actions", roundController.createRoundAction);
 router.delete("/rounds/:id/actions/:actionId", roundController.deleteRoundAction);
 router.post("/rounds/:id/calculate-score", roundController.calculateScore);
+router.post("/rounds/:id/calculate-scores-from-base", roundController.calculateScoresFromBaseScore);
 router.post("/rounds/:id/calculate-next-settings", roundController.calculateNextSettings);
 router.get("/rounds/tsumo-score-labels", roundController.getTsumoScoreLabels);
 router.put("/rounds/:id/end", roundController.endRound);

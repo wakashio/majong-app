@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { roundService } from "../services/roundService";
-import { calculateScore, getTsumoScoreLabels } from "../services/scoreCalculationService";
+import { calculateScore, getTsumoScoreLabels, calculateTsumoScoresFromBaseScore } from "../services/scoreCalculationService";
 import {
   calculateNextRoundSettings,
   calculateNextRoundNumber,
@@ -1076,6 +1076,134 @@ export const roundController = {
         if (
           error.message.includes("must be") ||
           error.message.includes("required")
+        ) {
+          const errorResponse: ErrorResponse = {
+            error: {
+              code: "VALIDATION_ERROR",
+              message: error.message,
+            },
+          };
+          res.status(422).json(errorResponse);
+          return;
+        }
+      }
+      const errorResponse: ErrorResponse = {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Internal server error",
+        },
+      };
+      res.status(500).json(errorResponse);
+    }
+  },
+
+  async calculateScoresFromBaseScore(req: Request, res: Response): Promise<void> {
+    try {
+      const id = req.params.id;
+      const body = req.body as {
+        baseScore: number;
+        winnerPlayerId: string;
+      };
+
+      // バリデーション
+      if (body.baseScore === undefined) {
+        const errorResponse: ErrorResponse = {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "baseScore is required",
+          },
+        };
+        res.status(400).json(errorResponse);
+        return;
+      }
+
+      if (!body.winnerPlayerId) {
+        const errorResponse: ErrorResponse = {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "winnerPlayerId is required",
+          },
+        };
+        res.status(400).json(errorResponse);
+        return;
+      }
+
+      // 局の情報を取得
+      const round = await roundService.findById(id, false);
+      if (!round) {
+        const errorResponse: ErrorResponse = {
+          error: {
+            code: "NOT_FOUND",
+            message: "Round not found",
+          },
+        };
+        res.status(404).json(errorResponse);
+        return;
+      }
+
+      // 半荘の参加者情報を取得
+      const prisma = getPrismaClient();
+      const hanchan = await prisma.hanchan.findUnique({
+        where: { id: round.hanchanId },
+        include: {
+          hanchanPlayers: {
+            select: {
+              playerId: true,
+            },
+          },
+        },
+      });
+
+      if (!hanchan) {
+        const errorResponse: ErrorResponse = {
+          error: {
+            code: "NOT_FOUND",
+            message: "Hanchan not found",
+          },
+        };
+        res.status(404).json(errorResponse);
+        return;
+      }
+
+      const playerIds = hanchan.hanchanPlayers.map((hp) => hp.playerId);
+
+      // バリデーション
+      if (!playerIds.includes(body.winnerPlayerId)) {
+        const errorResponse: ErrorResponse = {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "winnerPlayerId must be a player in the round",
+          },
+        };
+        res.status(422).json(errorResponse);
+        return;
+      }
+
+      const isDealer = body.winnerPlayerId === round.dealerPlayerId;
+
+      // 基本点から点数を計算（本場・積み棒を含めない）
+      const scores = calculateTsumoScoresFromBaseScore(
+        body.baseScore,
+        isDealer,
+        playerIds,
+        round.dealerPlayerId,
+        body.winnerPlayerId
+      );
+
+      const response = {
+        data: {
+          scores,
+        },
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error("Error calculating scores from base score:", error);
+      if (error instanceof Error) {
+        if (
+          error.message.includes("must be") ||
+          error.message.includes("required") ||
+          error.message.includes("Invalid")
         ) {
           const errorResponse: ErrorResponse = {
             error: {

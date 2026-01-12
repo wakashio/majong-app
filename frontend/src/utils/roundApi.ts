@@ -420,6 +420,44 @@ export async function calculateScore(
   }
 }
 
+export async function calculateScoresFromBaseScore(
+  roundId: string,
+  data: { baseScore: number; winnerPlayerId: string }
+): Promise<{ data: { scores: Array<{ playerId: string; scoreChange: number }> } } | ErrorResponse> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/rounds/${roundId}/calculate-scores-from-base`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        error: {
+          code: "HTTP_ERROR",
+          message: `HTTP error! status: ${response.status}`,
+        },
+      }));
+      return errorData as ErrorResponse;
+    }
+
+    const result = await response.json();
+    return result as { data: { scores: Array<{ playerId: string; scoreChange: number }> } };
+  } catch (error) {
+    return {
+      error: {
+        code: "NETWORK_ERROR",
+        message: error instanceof Error ? error.message : "Unknown error occurred",
+      },
+    } as ErrorResponse;
+  }
+}
+
 export async function calculateNextSettings(
   roundId: string,
   data: CalculateNextSettingsRequest

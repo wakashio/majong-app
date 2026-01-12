@@ -2,6 +2,18 @@ import {
   RoundResultType,
 } from "../types/round";
 
+export interface CalculateScoresFromBaseScoreRequest {
+  baseScore: number;
+  isDealer: boolean;
+  playerIds: string[];
+  dealerPlayerId: string;
+  winnerPlayerId: string;
+}
+
+export interface CalculateScoresFromBaseScoreResponse {
+  scores: Array<{ playerId: string; scoreChange: number }>;
+}
+
 /**
  * ツモ点数表の型定義
  */
@@ -128,7 +140,7 @@ export function calculateBaseScore(han: number, fu: number): number {
 }
 
 /**
- * ツモの打点を計算する（点数表を使用）
+ * ツモの打点を計算する（点数表を使用、本場・積み棒を含む）
  * フロー:
  * 1. 和了の点数を入力（フロントエンド） - totalScore（本場・積み棒を含まない）
  * 2. 点数表から支払い点数を取得し、本場を加算（バックエンド）
@@ -186,6 +198,61 @@ export function calculateTsumoScore(
         fromNonDealer,
       },
     };
+  }
+}
+
+/**
+ * ツモの打点を計算する（点数表を使用、本場・積み棒を含まない）
+ * フロントエンドから基本点（baseScore）を受け取り、基本点のみの点数を計算
+ * @param baseScore - 基本点（点数表のキー）
+ * @param isDealer - 親かどうか
+ * @param playerIds - 参加者IDの配列
+ * @param dealerPlayerId - 親のプレイヤーID
+ * @param winnerPlayerId - 和了者のプレイヤーID
+ * @returns 各プレイヤーの点数変動（本場・積み棒を含まない）
+ */
+export function calculateTsumoScoresFromBaseScore(
+  baseScore: number,
+  isDealer: boolean,
+  playerIds: string[],
+  dealerPlayerId: string,
+  winnerPlayerId: string
+): Array<{ playerId: string; scoreChange: number }> {
+  if (isDealer) {
+    // 親がツモ
+    const scoreEntry = tsumoScoreTable.dealer[baseScore];
+    if (!scoreEntry) {
+      throw new Error(`Invalid base score for dealer tsumo: ${baseScore}`);
+    }
+    const fromNonDealer = scoreEntry.fromNonDealer;
+    const winnerScore = fromNonDealer * 3;
+
+    return playerIds.map((playerId) => {
+      if (playerId === winnerPlayerId) {
+        return { playerId, scoreChange: winnerScore };
+      } else {
+        return { playerId, scoreChange: -fromNonDealer };
+      }
+    });
+  } else {
+    // 子がツモ
+    const scoreEntry = tsumoScoreTable.nonDealer[baseScore];
+    if (!scoreEntry) {
+      throw new Error(`Invalid base score for non-dealer tsumo: ${baseScore}`);
+    }
+    const fromDealer = scoreEntry.fromDealer;
+    const fromNonDealer = scoreEntry.fromNonDealer;
+    const winnerScore = fromDealer + fromNonDealer * 2;
+
+    return playerIds.map((playerId) => {
+      if (playerId === winnerPlayerId) {
+        return { playerId, scoreChange: winnerScore };
+      } else if (playerId === dealerPlayerId) {
+        return { playerId, scoreChange: -fromDealer };
+      } else {
+        return { playerId, scoreChange: -fromNonDealer };
+      }
+    });
   }
 }
 
