@@ -23,6 +23,9 @@ FROM nginx:alpine
 # ビルド成果物をコピー
 COPY --from=builder /app/dist /usr/share/nginx/html
 
+# nginx設定ファイルをコピー
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 # 環境変数をHTMLに注入するスクリプトをコピー
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh

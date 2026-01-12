@@ -52,6 +52,16 @@
 
 ## アイデア一覧
 
+### 2026-01-12 直接URLアクセス時の404エラー問題（nginx設定の見直し）
+
+### [議論待ち] 直接URLアクセス時の404エラー問題（nginx設定の見直し）
+
+- **内容**: SPA（Single Page Application）のルーティングで、直接URLにアクセスした際に404エラーが発生する問題。具体的には、`https://majong-app-frontend-staging-323648023154.us-west1.run.app/hanchans/b1832622-4dee-47db-a09f-b39283d8ab17/rounds`のようなパスに直接アクセスすると404エラーになる。現在の`nginx.conf`にはSPA用の設定（`try_files $uri $uri/ /index.html;`）が含まれているが、`Dockerfile`で`nginx.conf`がコピーされていない可能性がある。nginx設定を確認し、SPAのルーティングが正しく動作するように修正する必要がある。
+- **提案者**: ユーザー
+- **優先度**: 高
+- **関連機能**: nginx設定、Dockerfile、SPAルーティング、デプロイ設定、Cloud Run、`frontend/nginx.conf`、`frontend/Dockerfile`、`frontend/docker-entrypoint.sh`
+- **備考**: SPAでは、すべてのルートパス（`/hanchans/*`、`/sessions/*`など）へのリクエストを`index.html`にフォールバックする必要がある。現在の`nginx.conf`には設定が含まれているが、Dockerfileでコピーされていない可能性がある。また、静的ファイルのlocationブロックとSPA用のlocationブロックの優先順位も確認が必要。Cloud Runでの動作を確認し、必要に応じてnginx設定を修正する。
+
 ### 2026-01-12 局終了時のテストケースを追加したい
 
 ### [議論完了] 局終了時のテストケースを追加したい（リーチ者がツモ上がりした時の点数計算の不具合とテストケース追加）
