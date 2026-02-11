@@ -7,6 +7,7 @@ interface Props {
 
 interface Emits {
   (e: "end-hanchan"): void;
+  (e: "register-session"): void;
 }
 
 const props = defineProps<Props>();
@@ -14,6 +15,10 @@ const emit = defineEmits<Emits>();
 
 const handleEndHanchan = () => {
   emit("end-hanchan");
+};
+
+const handleRegisterSession = () => {
+  emit("register-session");
 };
 </script>
 
@@ -27,14 +32,26 @@ const handleEndHanchan = () => {
         {{ props.hanchan.hanchanPlayers.map((hp) => hp.player.name).join(", ") }}
       </p>
       <p><strong>ステータス:</strong> {{ props.hanchan.status === "IN_PROGRESS" ? "進行中" : "完了済み" }}</p>
-      <v-btn
-        v-if="props.hanchan.status === 'IN_PROGRESS'"
-        color="primary"
-        class="mt-4"
-        @click="handleEndHanchan"
-      >
-        半荘を終了
-      </v-btn>
+      <p v-if="props.hanchan.sessionId">
+        <strong>セッション:</strong> 登録済み
+      </p>
+      <div class="mt-4 d-flex gap-2">
+        <v-btn
+          v-if="!props.hanchan.sessionId"
+          color="primary"
+          variant="outlined"
+          @click="handleRegisterSession"
+        >
+          セッションを登録
+        </v-btn>
+        <v-btn
+          v-if="props.hanchan.status === 'IN_PROGRESS'"
+          color="primary"
+          @click="handleEndHanchan"
+        >
+          半荘を終了
+        </v-btn>
+      </div>
     </v-card-text>
   </v-card>
 </template>

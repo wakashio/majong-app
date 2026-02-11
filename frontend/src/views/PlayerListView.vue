@@ -178,7 +178,10 @@ onMounted(() => {
               :items-per-page="10"
             >
               <template #item="{ item }">
-                <tr>
+                <tr
+                  style="cursor: pointer"
+                  @click="handleEdit(item.id)"
+                >
                   <td>{{ item.name }}</td>
                   <td>{{ item.createdAt }}</td>
                   <td>{{ item.updatedAt }}</td>
@@ -188,7 +191,7 @@ onMounted(() => {
                       color="primary"
                       variant="text"
                       class="mr-2"
-                      @click="handleEdit(item.id)"
+                      @click.stop="handleEdit(item.id)"
                     >
                       編集
                     </v-btn>
@@ -196,7 +199,7 @@ onMounted(() => {
                       size="small"
                       color="error"
                       variant="text"
-                      @click="handleDelete(item.id)"
+                      @click.stop="handleDelete(item.id)"
                     >
                       削除
                     </v-btn>

@@ -13,7 +13,7 @@
 
     <v-row v-if="hanchan">
       <v-col cols="12">
-        <HanchanInfoCard :hanchan="hanchan" @end-hanchan="openEndHanchanDialog" />
+        <HanchanInfoCard :hanchan="hanchan" @end-hanchan="openEndHanchanDialog" @register-session="openSessionSelectDialog" />
       </v-col>
     </v-row>
 
@@ -57,7 +57,6 @@
                 @add-action="openActionDialog"
                 @delete-action="handleDeleteAction"
                 @end-round="openResultDialog"
-                @next-round="handleNextRoundFromPanel"
                 @delete-round="handleDeleteRound"
               />
             </v-expansion-panel-text>
@@ -143,6 +142,58 @@
       @confirm="handleEndHanchan"
     />
 
+    <!-- セッション選択ダイアログ -->
+    <v-dialog v-model="showSessionSelectDialog" max-width="600" persistent>
+      <v-card>
+        <v-card-title>セッションを選択</v-card-title>
+        <v-card-text>
+          <v-alert
+            v-if="sessionSelectError"
+            type="error"
+            class="mb-4"
+            dismissible
+            @click:close="sessionSelectError = null"
+          >
+            {{ sessionSelectError }}
+          </v-alert>
+
+          <v-progress-linear
+            v-if="isLoadingSessions"
+            indeterminate
+            color="primary"
+            class="mb-4"
+          ></v-progress-linear>
+
+          <v-data-table
+            v-else
+            :headers="[
+              { title: '日付', key: 'date' },
+              { title: 'セッション名', key: 'name' },
+              { title: '参加者', key: 'playerNames' },
+            ]"
+            :items="formattedSessions"
+            :items-per-page="10"
+            @click:row="handleSessionSelect"
+          >
+            <template #item="{ item }">
+              <tr
+                style="cursor: pointer"
+                @click="handleSessionSelect(item)"
+              >
+                <td>{{ item.date }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.playerNames }}</td>
+              </tr>
+            </template>
+          </v-data-table>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="closeSessionSelectDialog" :disabled="isLoading">キャンセル</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- 最新の局へスクロールボタン -->
     <v-btn
       v-if="sortedRounds.length >= 2"
@@ -174,8 +225,9 @@ import ResultInputDialog from "../components/ResultInputDialog.vue";
 import HanchanEndDialog from "../components/HanchanEndDialog.vue";
 import Breadcrumbs from "../components/Breadcrumbs.vue";
 import { updateHanchan } from "../utils/hanchanApi";
-import { getSession } from "../utils/sessionApi";
+import { getSession, getSessions } from "../utils/sessionApi";
 import { HanchanStatus } from "../types/hanchan";
+import type { SessionListItem, ErrorResponse } from "../types/session";
 import type { UmaOkaConfig } from "../types/hanchan";
 import { useHanchanData } from "../composables/useHanchanData";
 import { useRoundManagement } from "../composables/useRoundManagement";
@@ -185,12 +237,11 @@ import { useRoundDisplay } from "../composables/useRoundDisplay";
 import { useRoundData } from "../composables/useRoundData";
 import { useRoundDialogs } from "../composables/useRoundDialogs";
 import { useRoundExpansion } from "../composables/useRoundExpansion";
-import { useRoundNavigation } from "../composables/useRoundNavigation";
 import {
   getRiichiSticksScoreChangeForTable,
   getHonbaScoreChangeForTable,
 } from "../composables/useScoreCalculation";
-import type { Score, Round } from "../types/round";
+import type { Score, Round, Wind } from "../types/round";
 
 const route = useRoute();
 
@@ -293,7 +344,7 @@ const {
 
 const handleSaveRound = createHandleSaveRound(roundScoreInputs, getAllActions, loadRoundData, validateScoreInputsForRound);
 
-// handleConfirmResultをラップしてhandleSaveRoundを呼び出す
+// handleConfirmResultをラップしてhandleSaveRoundを呼び出し、次局を作成
 const handleConfirmResult = async (): Promise<void> => {
   // closeResultDialog()が呼ばれる前にroundIdを保存
   const roundId = currentRoundIdForResultDialog.value;
@@ -303,20 +354,101 @@ const handleConfirmResult = async (): Promise<void> => {
 
   await handleConfirmResultWithoutSave();
   await handleSaveRound(roundId);
-};
 
-const {
-  handleNextRoundFromPanel,
-} = useRoundNavigation(
-  rounds,
-  roundScores,
-  error,
-  hanchan,
-  expandedPanels,
-  loadRounds,
-  calculateNextRoundSettings,
-  createNextRound
-);
+  // 次局を作成
+  const round = rounds.value.find((r) => r.id === roundId);
+  if (!round) {
+    return;
+  }
+
+  if (!round.resultType) {
+    return;
+  }
+
+  try {
+    // スコア入力から和了者と親のテンパイ状態を取得
+    const scoreInputs = roundScoreInputs.value[roundId] || [];
+    const winnerPlayerId = scoreInputs.find((si) => si.isWinner)?.playerId;
+
+    // 親のテンパイ状態を取得
+    const round = rounds.value.find((r) => r.id === roundId);
+    const dealerScore = round ? scoreInputs.find((si) => si.playerId === round.dealerPlayerId) : undefined;
+    const isDealerTenpai = dealerScore?.isTenpai === true ? true : undefined;
+
+    await loadRounds();
+    const updatedRound = rounds.value.find((r) => r.id === roundId);
+    if (!updatedRound) {
+      return;
+    }
+
+    const nextSettingsResult = await calculateNextRoundSettings(roundId, {
+      resultType: updatedRound.resultType!,
+      winnerPlayerId,
+      isDealerTenpai,
+    });
+
+    if ("error" in nextSettingsResult) {
+      // エラーは無視（次局作成はオプション）
+      return;
+    }
+
+    const nextSettings = nextSettingsResult.data;
+
+    const nextRound = rounds.value.find(
+      (r) =>
+        r.roundNumber === nextSettings.nextRoundNumber &&
+        r.honba === nextSettings.nextHonba &&
+        r.id !== roundId
+    );
+
+    if (nextRound) {
+      if (!expandedPanels.value.includes(nextRound.id)) {
+        expandedPanels.value = [...expandedPanels.value, nextRound.id];
+        await nextTick();
+      }
+    } else {
+      let nextDealerPlayerId = "";
+      if (hanchan.value?.hanchanPlayers && hanchan.value.hanchanPlayers.length > 0) {
+        const lastDealerIndex = hanchan.value.hanchanPlayers.findIndex(
+          (hp) => hp.playerId === updatedRound.dealerPlayerId
+        );
+        if (lastDealerIndex >= 0) {
+          // 連荘判定はisRenchanフラグを使用
+          if (nextSettings.isRenchan) {
+            nextDealerPlayerId = updatedRound.dealerPlayerId;
+          } else {
+            const nextIndex = (lastDealerIndex + 1) % hanchan.value.hanchanPlayers.length;
+            if (hanchan.value.hanchanPlayers[nextIndex]) {
+              nextDealerPlayerId = hanchan.value.hanchanPlayers[nextIndex].playerId;
+            }
+          }
+        } else {
+          if (hanchan.value.hanchanPlayers[0]) {
+            nextDealerPlayerId = hanchan.value.hanchanPlayers[0].playerId;
+          }
+        }
+      }
+
+      if (!nextDealerPlayerId) {
+        // エラーは無視（次局作成はオプション）
+        return;
+      }
+
+      const createResult = await createNextRound(roundId, {
+        ...nextSettings,
+        nextWind: nextSettings.nextWind as Wind,
+      }, nextDealerPlayerId);
+
+      if (createResult && !expandedPanels.value.includes(createResult.id)) {
+        expandedPanels.value = [...expandedPanels.value, createResult.id];
+        await nextTick();
+      }
+    }
+  } catch (err) {
+    // エラーは無視（次局作成はオプション）
+    console.error("次局作成エラー:", err);
+  }
+};
 
 const {
   handleAddAction,
@@ -478,6 +610,21 @@ const confirmDeleteRound = async (): Promise<void> => {
 const showEndHanchanDialog = ref(false);
 const sessionUmaOkaConfig = ref<UmaOkaConfig | undefined>(undefined);
 
+// セッション選択ダイアログ
+const showSessionSelectDialog = ref(false);
+const sessions = ref<SessionListItem[]>([]);
+const isLoadingSessions = ref(false);
+const sessionSelectError = ref<string | null>(null);
+
+const formattedSessions = computed(() => {
+  return sessions.value.map((session) => ({
+    ...session,
+    name: session.name || "無題",
+    date: new Date(session.date).toLocaleDateString("ja-JP"),
+    playerNames: session.players.map((p) => p.name).join(", "),
+  }));
+});
+
 // 半荘終了ダイアログを開く
 const openEndHanchanDialog = async (): Promise<void> => {
   showEndHanchanDialog.value = true;
@@ -521,6 +668,66 @@ const handleEndHanchan = async (umaOkaConfig?: UmaOkaConfig): Promise<void> => {
     await loadHanchanStatistics(hanchan.value.id);
 
     showEndHanchanDialog.value = false;
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : "Unknown error occurred";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// セッション選択ダイアログを開く
+const openSessionSelectDialog = async (): Promise<void> => {
+  showSessionSelectDialog.value = true;
+  sessionSelectError.value = null;
+
+  try {
+    isLoadingSessions.value = true;
+    const result = await getSessions(50, 0);
+
+    if ("error" in result) {
+      const errorResponse = result as ErrorResponse;
+      sessionSelectError.value = errorResponse.error.message;
+      return;
+    }
+
+    sessions.value = result.data;
+  } catch (err) {
+    sessionSelectError.value = err instanceof Error ? err.message : "Unknown error occurred";
+  } finally {
+    isLoadingSessions.value = false;
+  }
+};
+
+// セッション選択ダイアログを閉じる
+const closeSessionSelectDialog = (): void => {
+  showSessionSelectDialog.value = false;
+  sessions.value = [];
+  sessionSelectError.value = null;
+};
+
+// セッションを選択
+const handleSessionSelect = async (session: { id: string }): Promise<void> => {
+  if (!hanchan.value) {
+    return;
+  }
+
+  try {
+    isLoading.value = true;
+    error.value = null;
+
+    const result = await updateHanchan(hanchan.value.id, {
+      sessionId: session.id,
+    });
+
+    if ("error" in result) {
+      error.value = result.error.message;
+      return;
+    }
+
+    // 半荘情報を再取得
+    await loadHanchan(hanchan.value.id);
+
+    closeSessionSelectDialog();
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unknown error occurred";
   } finally {

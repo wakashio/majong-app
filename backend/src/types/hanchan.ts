@@ -37,6 +37,7 @@ export interface UpdateHanchanRequest {
   name?: string;
   status?: HanchanStatus;
   finalScores?: Record<string, number>;
+  sessionId?: string | null;
 }
 
 export interface HanchanResponse {

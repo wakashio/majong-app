@@ -48,6 +48,10 @@ const handleCreate = (): void => {
   router.push("/hanchans/new");
 };
 
+const handleDetail = (id: string): void => {
+  router.push(`/hanchans/${id}/rounds`);
+};
+
 const handleEdit = (id: string): void => {
   router.push(`/hanchans/${id}/edit`);
 };
@@ -152,7 +156,10 @@ onMounted(() => {
                 </v-chip>
               </template>
               <template #item="{ item }">
-                <tr>
+                <tr
+                  style="cursor: pointer"
+                  @click="handleDetail(item.id)"
+                >
                   <td>{{ item.name }}</td>
                   <td>{{ item.playerNames }}</td>
                   <td>{{ item.startedAt }}</td>
@@ -171,7 +178,7 @@ onMounted(() => {
                       color="primary"
                       variant="text"
                       class="mr-2"
-                      @click="handleEdit(item.id)"
+                      @click.stop="handleEdit(item.id)"
                     >
                       編集
                     </v-btn>
@@ -179,7 +186,7 @@ onMounted(() => {
                       size="small"
                       color="error"
                       variant="text"
-                      @click="handleDelete(item.id)"
+                      @click.stop="handleDelete(item.id)"
                     >
                       削除
                     </v-btn>

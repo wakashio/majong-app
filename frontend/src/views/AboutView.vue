@@ -1,14 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import Breadcrumbs from '../components/Breadcrumbs.vue'
 
 const version = ref('1.0.0')
-const updateDate = ref('2025-12-30')
-
-onMounted(() => {
-  // package.jsonからバージョンを取得することも可能
-  // 現時点では固定値を使用
-})
+const updateDate = ref('2026-01-12')
 </script>
 
 <template>
@@ -25,13 +20,17 @@ onMounted(() => {
           <v-card-text>
             <p>
               麻雀記録アプリは、麻雀の半荘や局の記録を管理するためのアプリケーションです。
-              参加者の登録、半荘の記録、局の記録、打点計算などの機能を提供します。
+              参加者の登録、セッション管理、半荘の記録、局の記録、打点計算などの機能を提供します。
             </p>
             <h3 class="mt-4 mb-2">主な機能</h3>
             <v-list>
               <v-list-item prepend-icon="mdi-account-group">
                 <v-list-item-title>参加者管理</v-list-item-title>
                 <v-list-item-subtitle>参加者の登録、編集、削除が可能です</v-list-item-subtitle>
+              </v-list-item>
+              <v-list-item prepend-icon="mdi-calendar-multiple">
+                <v-list-item-title>セッション管理</v-list-item-title>
+                <v-list-item-subtitle>1日の麻雀セッションを管理し、その日の参加者と半荘を紐づけます</v-list-item-subtitle>
               </v-list-item>
               <v-list-item prepend-icon="mdi-cards">
                 <v-list-item-title>半荘管理</v-list-item-title>
@@ -63,19 +62,23 @@ onMounted(() => {
                 <v-list-item-subtitle>「参加者一覧」から参加者を登録します</v-list-item-subtitle>
               </v-list-item>
               <v-list-item>
-                <v-list-item-title>2. 半荘の開始</v-list-item-title>
-                <v-list-item-subtitle>「半荘一覧」から新規半荘を作成し、参加者を選択します</v-list-item-subtitle>
+                <v-list-item-title>2. セッションの作成</v-list-item-title>
+                <v-list-item-subtitle>「セッション一覧」から新規セッションを作成し、参加者を選択します</v-list-item-subtitle>
               </v-list-item>
               <v-list-item>
-                <v-list-item-title>3. 局の記録</v-list-item-title>
+                <v-list-item-title>3. 半荘の開始</v-list-item-title>
+                <v-list-item-subtitle>セッション詳細画面から半荘を作成し、参加者を選択します</v-list-item-subtitle>
+              </v-list-item>
+              <v-list-item>
+                <v-list-item-title>4. 局の記録</v-list-item-title>
                 <v-list-item-subtitle>半荘詳細画面から局を開始し、進行中に記録を行います</v-list-item-subtitle>
               </v-list-item>
               <v-list-item>
-                <v-list-item-title>4. 局の終了</v-list-item-title>
+                <v-list-item-title>5. 局の終了</v-list-item-title>
                 <v-list-item-subtitle>局終了時に打点を入力し、自動で計算されます</v-list-item-subtitle>
               </v-list-item>
               <v-list-item>
-                <v-list-item-title>5. 半荘の終了</v-list-item-title>
+                <v-list-item-title>6. 半荘の終了</v-list-item-title>
                 <v-list-item-subtitle>すべての局が終了したら、半荘を終了します</v-list-item-subtitle>
               </v-list-item>
             </v-list>

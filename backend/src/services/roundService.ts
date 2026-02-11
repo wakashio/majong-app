@@ -365,17 +365,6 @@ export const roundService = {
       throw new Error("playerId must be a player in the round");
     }
 
-    if (
-      (data.type === NakiType.PON ||
-        data.type === NakiType.CHI ||
-        data.type === NakiType.DAIMINKAN) &&
-      !data.targetPlayerId
-    ) {
-      throw new Error(
-        "targetPlayerId is required for PON, CHI, DAIMINKAN"
-      );
-    }
-
     if (data.targetPlayerId && !playerIds.includes(data.targetPlayerId)) {
       throw new Error("targetPlayerId must be a player in the round");
     }
@@ -503,16 +492,6 @@ export const roundService = {
     if (data.type === RoundActionType.NAKI) {
       if (!data.nakiType) {
         throw new Error("nakiType is required for NAKI");
-      }
-      if (
-        (data.nakiType === NakiType.PON ||
-          data.nakiType === NakiType.CHI ||
-          data.nakiType === NakiType.DAIMINKAN) &&
-        !data.targetPlayerId
-      ) {
-        throw new Error(
-          "targetPlayerId is required for PON, CHI, DAIMINKAN"
-        );
       }
       if (data.targetPlayerId && !playerIds.includes(data.targetPlayerId)) {
         throw new Error("targetPlayerId must be a player in the round");

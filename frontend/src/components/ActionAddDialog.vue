@@ -42,13 +42,6 @@ const dialogValue = computed({
   set: (value) => emit("update:modelValue", value),
 });
 
-const targetPlayerOptions = computed(() => {
-  if (!props.playerId) {
-    return props.playerOptions;
-  }
-  return props.playerOptions.filter((option) => option.value !== props.playerId);
-});
-
 const handleActionTypeChange = (value: string | string[]): void => {
   const val = Array.isArray(value) ? value[0] : value;
   if (typeof val === "string") {
@@ -66,11 +59,6 @@ const handlePlayerIdChange = (value: string | string[]): void => {
 const handleNakiTypeChange = (value: string | string[]): void => {
   const val = Array.isArray(value) ? value[0] : value;
   emit("update:nakiType", typeof val === "string" ? val : null);
-};
-
-const handleTargetPlayerIdChange = (value: string | string[]): void => {
-  const val = Array.isArray(value) ? value[0] : value;
-  emit("update:targetPlayerId", typeof val === "string" ? val : null);
 };
 
 const handleConfirm = (): void => {
@@ -118,15 +106,6 @@ const handleCancel = (): void => {
             :required="true"
             :disabled="props.isLoading"
             @update:model-value="handleNakiTypeChange"
-          />
-          <PlayerSelectButton
-            v-if="props.nakiType !== NakiType.ANKAN"
-            :model-value="props.targetPlayerId ?? undefined"
-            :items="targetPlayerOptions"
-            label="対象参加者"
-            :disabled="props.playerOptions.length === 0 || props.isLoading"
-            :required="true"
-            @update:model-value="handleTargetPlayerIdChange"
           />
         </template>
       </v-card-text>

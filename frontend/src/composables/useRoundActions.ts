@@ -132,10 +132,7 @@ export function useRoundActions(
           return;
         }
         request.nakiType = newAction.value.nakiType;
-        request.targetPlayerId =
-          newAction.value.nakiType !== NakiType.ANKAN
-            ? newAction.value.targetPlayerId
-            : undefined;
+        request.targetPlayerId = undefined;
       }
 
       const result = await createRoundAction(roundId, request);

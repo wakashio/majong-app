@@ -57,6 +57,7 @@ export interface UpdateHanchanRequest {
   status?: HanchanStatus;
   finalScores?: Record<string, number>;
   umaOkaConfig?: UmaOkaConfig;
+  sessionId?: string | null;
 }
 
 export interface HanchansListResponse {

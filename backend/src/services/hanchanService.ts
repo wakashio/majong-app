@@ -19,6 +19,7 @@ export interface UpdateHanchanData {
   status?: HanchanStatus;
   finalScores?: Record<string, number>;
   umaOkaConfig?: UmaOkaConfig;
+  sessionId?: string | null;
 }
 
 export const hanchanService = {
@@ -178,12 +179,13 @@ export const hanchanService = {
   },
 
   async update(id: string, data: UpdateHanchanData) {
-    const { name, status, finalScores, umaOkaConfig } = data;
+    const { name, status, finalScores, umaOkaConfig, sessionId } = data;
 
     const updateData: {
       name?: string;
       status?: HanchanStatus;
       endedAt?: Date | null;
+      sessionId?: string | null;
     } = {};
 
     if (name !== undefined) {
@@ -196,6 +198,22 @@ export const hanchanService = {
         updateData.endedAt = new Date();
       } else if (status === HanchanStatus.IN_PROGRESS) {
         updateData.endedAt = null;
+      }
+    }
+
+    if (sessionId !== undefined) {
+      if (sessionId === null) {
+        updateData.sessionId = null;
+      } else {
+        // セッションが存在するか確認
+        const prisma = getPrismaClient();
+        const session = await prisma.session.findUnique({
+          where: { id: sessionId },
+        });
+        if (!session) {
+          throw new Error("Session not found");
+        }
+        updateData.sessionId = sessionId;
       }
     }
 

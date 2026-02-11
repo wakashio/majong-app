@@ -129,7 +129,10 @@ onMounted(() => {
               :items-per-page="10"
             >
               <template #item="{ item }">
-                <tr>
+                <tr
+                  style="cursor: pointer"
+                  @click="handleDetail(item.id)"
+                >
                   <td>{{ item.date }}</td>
                   <td>{{ item.name }}</td>
                   <td>{{ item.playerNames }}</td>
@@ -140,7 +143,7 @@ onMounted(() => {
                       size="small"
                       color="primary"
                       variant="text"
-                      @click="handleDetail(item.id)"
+                      @click.stop="handleDetail(item.id)"
                     >
                       詳細
                     </v-btn>
@@ -148,7 +151,7 @@ onMounted(() => {
                       size="small"
                       color="primary"
                       variant="text"
-                      @click="handleEdit(item.id)"
+                      @click.stop="handleEdit(item.id)"
                     >
                       編集
                     </v-btn>
@@ -156,7 +159,7 @@ onMounted(() => {
                       size="small"
                       color="error"
                       variant="text"
-                      @click="handleDelete(item.id)"
+                      @click.stop="handleDelete(item.id)"
                     >
                       削除
                     </v-btn>

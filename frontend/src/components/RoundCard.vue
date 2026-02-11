@@ -22,7 +22,6 @@ const emit = defineEmits<{
   "add-action": [roundId: string];
   "delete-action": [roundId: string, actionId: string];
   "end-round": [roundId: string];
-  "next-round": [roundId: string];
   "delete-round": [roundId: string];
 }>();
 
@@ -36,10 +35,6 @@ const handleDeleteAction = (actionId: string): void => {
 
 const handleEndRound = (): void => {
   emit("end-round", props.round.id);
-};
-
-const handleNextRound = (): void => {
-  emit("next-round", props.round.id);
 };
 
 const handleDeleteRound = (): void => {
@@ -70,7 +65,6 @@ const handleDeleteRound = (): void => {
       :round="props.round"
       :is-loading="props.isLoading"
       @end="handleEndRound"
-      @next="handleNextRound"
       @delete="handleDeleteRound"
     />
   </div>

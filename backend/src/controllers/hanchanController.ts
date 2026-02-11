@@ -369,11 +369,21 @@ export const hanchanController = {
         return;
       }
 
+      let sessionId: string | null | undefined = undefined;
+      if (req.body.sessionId !== undefined) {
+        if (req.body.sessionId === null) {
+          sessionId = null;
+        } else {
+          sessionId = validateSessionId(req.body.sessionId);
+        }
+      }
+
       const hanchan = await hanchanService.update(id, {
         name,
         status,
         finalScores,
         umaOkaConfig,
+        sessionId,
       });
 
       res.json({
@@ -383,6 +393,7 @@ export const hanchanController = {
           startedAt: hanchan.startedAt.toISOString(),
           endedAt: hanchan.endedAt?.toISOString() || null,
           status: hanchan.status,
+          sessionId: hanchan.sessionId || null,
           createdAt: hanchan.createdAt.toISOString(),
           updatedAt: hanchan.updatedAt.toISOString(),
           hanchanPlayers: hanchan.hanchanPlayers.map((hp) => ({
